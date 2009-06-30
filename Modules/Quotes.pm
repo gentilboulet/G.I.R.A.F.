@@ -11,7 +11,7 @@ sub init {
 	#$Admin::public_parsers->{bot_karma_plusplus}={function=>\&bot_karma_pp,regex=>'(\w+)\+\+'};
 	#$Admin::public_parsers->{bot_karma_moinsmoins}={function=>\&bot_karma_mm,regex=>'(\w+)--'};
 
-	$dbh=DBI->connect("dbi:SQLite:dbname=db/quote.db","","");
+	$dbh=DBI->connect("dbi:SQLite:dbname=Modules/DB/quote.db","","");
 	$dbh->do("BEGIN TRANSACTION;");
 	$dbh->do("CREATE TABLE quote (numero INTEGER, channel TEXT, quote TEXT , date TEXT, quoteur TEXT);");
 	$dbh->do("COMMIT;");

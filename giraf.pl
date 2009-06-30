@@ -18,13 +18,14 @@ my $config = 'giraf.conf';    # default name of the config file
 my $botname;                   #botname
 my $triggers;
 my $kernel;
+my $quit=0;
 readconfig();
 
 our %opts;
 
 GetOptions(
 	\%opts,       "help",       "server=s",   "serverpass=s",	"botpass=s",
-	"botnick=s",  "botuser=s",  "botrlnm=s",  "botchan=s",
+	"botnick=s",  "botuser=s",  "botrealnam=s",  			"botchan=s",		"botbindip=s",
 	"botident=s", "botmodes=s", "botopcmd=s", "maxtries=i",
 	"botadmin=s", "logfile=s",  "debug=i",	  "triggers=s",
   )
@@ -40,8 +41,9 @@ my $irc = POE::Component::IRC->spawn(
 	nick     => $botname,
 	server   => $opts{server},
 	port     => $opts{port},
-	ircname  => $opts{botrlnme},
+	ircname  => $opts{botrealname},
 	username => $opts{botuser},
+	localaddr=> $opts{botbindip},
 	debug    => 0,
   )
   or die "Oh noooo! $!";
@@ -136,16 +138,22 @@ sub _default
 
 sub irc_disconnected
 {
-	debug( "Lost connection to server " . $opts{server} . ".\n" );
-	irc_reconnect( $_[KERNEL] );
+	if(!$quit)
+	{
+		debug( "Lost connection to server " . $opts{server} . ".\n" );
+		irc_reconnect( $_[KERNEL] );
+	}
 }
 
 sub irc_error
 {
-	my $err = $_[ARG0];
-	debug("Server error occurred! $err\n");
-	sleep 60;
-	irc_reconnect( $_[KERNEL] );
+	if(!$quit)
+	{
+		my $err = $_[ARG0];
+		debug("Server error occurred! $err\n");
+		sleep 60;
+		irc_reconnect( $_[KERNEL] );
+	}
 }
 
 sub irc_join
@@ -160,7 +168,7 @@ sub irc_msg
 {
 	my ( $kernel, $sender, $who, $where, $what ) = @_[ KERNEL, SENDER, ARG0, ARG1, ARG2 ];
 	my $nick = ( split /!/, $who )[0];
-	#debug("@$where:$nick : $what");
+	debug("@$where:$nick : $what");
 	emit(Admin->private_msg( $nick, $who, $where, $what ) );
 }
 
@@ -169,13 +177,13 @@ sub irc_public
 	my ( $kernel, $sender, $who, $where, $what ) = @_[ KERNEL, SENDER, ARG0, ARG1, ARG2 ];
 	my $nick = ( split /!/, $who )[0];
 	my $channel = $where->[0];
-	#debug("@$where:$nick : $what");
+	debug("@$where:$nick : $what");
 	emit(Admin->public_msg( $nick, $channel, $what ) );
-	my $regex=$triggers."reload";
-	if ( $what =~ /^$regex$/ )
-	{
-		#reload_modules();
-	}
+	#my $regex=$triggers."reload";
+	#if ( $what =~ /^$regex$/ )
+	#{
+	#	reload_modules();
+	#}
 	undef;
 }
 
@@ -251,9 +259,9 @@ sub irc_reconnect
 sub sigint
 {
 	my $kernel = $_[KERNEL];
-	$kernel->post( $irc => quit => "Adieu monde cruel!" );
-	debug("Ca piiiiiiique!!!!!!");
+	set_quit();
 	$kernel->sig('INT');
+	$kernel->post( $irc => quit => "Adieu monde cruel!" );
 	$kernel->sig_handled();
 }
 
@@ -278,8 +286,7 @@ sub _start
 	Chan->init( $kernel,  $irc ,$botname);
 	Admin->init( $kernel, $irc ,$triggers);
 	$kernel->post ($irc_session =>  'privmsg' => nickserv => "IDENTIFY ".$opts{botpass});
-
-
+	$kernel->sig( INT => "sigint" );
 }
 
 sub _stop
@@ -360,12 +367,26 @@ sub bbcode
 sub debug
 {
 	my ($text) = @_;
-#	if ( $opts{debug} )
+	_log($text,$opts{debug});
+	return $text;
+}
+
+sub _log
+{
+	my ($text,$silent) = @_;
+	if($silent==1)
 	{
 		print ts() . "$text\n";
 	}
+	if ($opts{logfile} )
+	{
+		open (LOGF, '>>'.$opts{logfile});
+		print LOGF ts() . "$text\n";
+		close LOGF;
+	}
 	return $text;
 }
+
 
 sub emit
 {
@@ -389,15 +410,10 @@ sub emit
 	}
 }
 
-sub quit
+sub set_quit
 {
 	my ( $kernel, $reason ) = @_;
-	if ( !$reason )
-	{
-		$reason = "All your bot is belong to us";
-	}
-	my $kernel = shift;
-	$kernel->signal( $kernel, 'POCOIRC_SHUTDOWN', $reason );
+	$quit=1;
 }
 
 sub readconfig
@@ -454,9 +470,10 @@ sub readconfig
 
 sub reload_modules
 {
-	#debug("Rechargement des modules");
-	#Admin->reload_modules;
-	#Reload->check;
+	debug("Rechargement des modules start");
+	Admin->reload_modules;
+#	Reload->check;
+	debug("Rechargement des modules stop");
 }
 
 sub ts

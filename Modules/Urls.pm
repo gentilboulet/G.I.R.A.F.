@@ -10,7 +10,7 @@ sub init {
 	my ($kernel,$irc) = @_;
 	$Admin::public_functions->{bot_list_urls}={function=>\&bot_list_urls,regex=>'urls.*'};
 	$Admin::public_parsers->{bot_add_urls}={function=>\&bot_add_urls,regex=>'((((https?|ftp):\/\/)|www\.)(([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)|localhost|([a-zA-Z0-9\-]+\.)*[a-zA-Z0-9\-]+\.(com|net|org|info|biz|gov|name|edu|[a-zA-Z][a-zA-Z]))(:[0-9]+)?((\/|\?)[^ "]*[^ ,;\.:">)])?)'};
-	$dbh=DBI->connect("dbi:SQLite:dbname=db/urls.db","","");
+	$dbh=DBI->connect("dbi:SQLite:dbname=Modules/db/urls.db","","");
 	$dbh->do("BEGIN TRANSACTION;");
 	$dbh->do("CREATE TABLE urls (id INTEGER PRIMARY KEY, user TEXT, channel TEXT, date TEXT, url TEXT);");
 	$dbh->do("COMMIT;");

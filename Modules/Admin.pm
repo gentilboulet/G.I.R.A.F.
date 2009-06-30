@@ -23,7 +23,7 @@ our $dbh;
 
 sub init_sessions {
 
-	$dbh=DBI->connect("dbi:SQLite:dbname=db/modules.db","","");
+	$dbh=DBI->connect("dbi:SQLite:dbname=Modules/DB/modules.db","","");
 	my $sth=$dbh->prepare("SELECT file,name FROM modules WHERE session>0");
         my ($module, $module_name);
         $sth->bind_columns( \$module, \$module_name );
@@ -31,7 +31,7 @@ sub init_sessions {
         while($sth->fetch() )
         {
 		require($module);
-	       #eval "&".$module_name.'::init_session();';
+	        eval "&".$module_name.'::init_session();';
         }
 
 }
@@ -45,12 +45,12 @@ sub init {
 	$public_functions->{bot_do}={function=>\&bot_do,regex=>'do (.*)'};
 	$public_functions->{bot_load_module}={function=>\&bot_load_module,regex=>'load (.*)'};
 	$public_functions->{bot_add_module}={function=>\&bot_add_module,regex=>'add module (.*)'};
-	$public_functions->{bot_quit}={function=>\&bot_quit,regex=>'quit (.*)'};
+	$public_functions->{bot_quit}={function=>\&bot_quit,regex=>'quit(.*)'};
 
-        $dbh=DBI->connect("dbi:SQLite:dbname=db/modules.db","","");
+        $dbh=DBI->connect("dbi:SQLite:dbname=Modules/DB/modules.db","","");
 	$dbh->do("CREATE TABLE modules (autorun NUMERIC, file TEXT, name TEXT,session NUMERIC);");
 	$dbh->do("CREATE TABLE users (name TEXT PRIMARY KEY, privileges NUMERIC);");
-	$dbh->do("INSERT  INTO users(name,privileges) VALUES('GentilBoulet',0);");
+	$dbh->do("INSERT INTO users(name,privileges) VALUES('GentilBoulet',0);");
 
 	my $sth=$dbh->prepare("SELECT file,name FROM modules WHERE autorun>0");
 	my ($module, $module_name);
@@ -140,7 +140,6 @@ sub public_msg
 sub reload_modules
 {
 	Reload->check;
-
 }
 
 sub private_msg
@@ -192,7 +191,7 @@ sub bot_do {
 sub bot_load_module {
 	my($nick, $dest, $what)=@_;
 	my @return;
-	my $regex= $triggers."load (.*)";
+	my $regex= $triggers."load? (.*)";
 	my $sth=$dbh->prepare("SELECT COUNT(*),file,name FROM modules WHERE name LIKE ?");
 	my ($count,$module,$module_name);
 	$sth->bind_columns( \$count, \$module , \$module_name);
@@ -256,33 +255,35 @@ sub bot_add_module {
 
 sub bot_quit {
 	my($nick, $dest, $what)=@_;
-	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges < 1");
+	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges >= 10000");
 	my $count;
 	my @return;
 	$sth->bind_columns( \$count);
 	$sth->execute($nick);
 	$sth->fetch();
-	my $regex= $triggers."quit (.*)";
+	my $regex= $triggers."quit (.+)";
 	if($count > 0)
 	{
-		if( my ($reason) = $what=~/$regex/ )
+		$sth=$dbh->prepare("SELECT name FROM modules");
+		my ($module_name);
+		$sth->bind_columns( \$module_name);
+		$sth->execute();
+		while($sth->fetch() )
 		{
+			eval "&".$module_name.'::quit();'
+		}
+		\&Giraf::set_quit();
+		my $reason="All your bot are belong to us";
+		if($what=~/$regex/ )
+		{
+			$reason=$1;
 			$kernel->signal( $kernel, 'POCOIRC_SHUTDOWN', $reason );
 		}
 		else
 		{
-			$reason="All your bot is belong to us";
 			$kernel->signal( $kernel, 'POCOIRC_SHUTDOWN', $reason );
 		}
 	}
-	$sth=$dbh->prepare("SELECT name FROM modules");
-        my ($module_name);
-        $sth->bind_columns( \$module_name);
-        $sth->execute();
-        while($sth->fetch() )
-        {
-		eval "&".$module_name.'::quit();'
-        }
 
 	return @return
 }

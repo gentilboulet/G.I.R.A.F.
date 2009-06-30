@@ -12,7 +12,7 @@ sub init {
 	$Admin::public_parsers->{bot_karma_plusplus}={function=>\&bot_karma_pp,regex=>'(\w+)\+\+'};
 	$Admin::public_parsers->{bot_karma_moinsmoins}={function=>\&bot_karma_mm,regex=>'(\w+)--'};
 
-	$dbh=DBI->connect("dbi:SQLite:dbname=db/karma.db","","");
+	$dbh=DBI->connect("dbi:SQLite:dbname=Modules/DB/karma.db","","");
 	$dbh->do("BEGIN TRANSACTION;");
 	$dbh->do("CREATE TABLE karma (karma INTEGER , keyword TEXT UNIQUE);");
 	$dbh->do("COMMIT;");
