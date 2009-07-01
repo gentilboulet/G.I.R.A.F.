@@ -41,7 +41,7 @@ sub bot_search {
 			{
 				my ($unescapedUrl,$url,$visibleUrl,$cacheUrl,$title,$titleNoFormatting,$content) = ($1,$2,$3,$4,$5,$6,$7);
 #				print "unescapedUrl=$unescapedUrl\nurl=$url\nvisibleUrl=$visibleUrl\ncacheUrl=$cacheUrl\ntitle=$title\ntitleNoFormatting=$titleNoFormatting\ncontent=$content\n";
-				my $ligne= {action =>"MSG",dest=>$dest,msg=>'[b]'.$titleNoFormatting.'[/b] - [c=teal]'.$unescapedUrl.'[/c]'};
+				my $ligne= {action =>"MSG",dest=>$dest,msg=>'[b]'.$titleNoFormatting.'[/b] - [c=teal]'.json_decode($unescapedUrl).'[/c]'};
 				push(@return,$ligne);
 			}
 			else
@@ -77,7 +77,7 @@ sub bot_searchn {
 				$matchednum++;		
 				print "num=$num,matchednum=$matchednum\n";
                                 my ($unescapedUrl,$url,$visibleUrl,$cacheUrl,$title,$titleNoFormatting,$content) = ($1,$2,$3,$4,$5,$6,$7);
-                                my $ligne= {action =>"MSG",dest=>$dest,msg=>'[c=purple]'.$matchednum.'[/c] : [b]'.$titleNoFormatting.'[/b] - [c=teal]'.$unescapedUrl.'[/c]'};
+                                my $ligne= {action =>"MSG",dest=>$dest,msg=>'[c=purple]'.$matchednum.'[/c] : [b]'.$titleNoFormatting.'[/b] - [c=teal]'.json_decode($unescapedUrl).'[/c]'};
                                 push(@return,$ligne);
                         }
 			
@@ -91,5 +91,12 @@ sub bot_searchn {
         return @return;
 }
 
-
+sub json_decode {
+	my ($data)=@_;
+	$data=~s/\\\\u003e/\>/g;
+	$data=~s/\\\\u003d/=/g;
+	$data=~s/\\\\u0026/\\\&/g;
+	$data=~s/\\\\u003c/\</g;
+	return $data;
+}
 1;
