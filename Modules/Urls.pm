@@ -10,10 +10,15 @@ sub init {
 	my ($kernel,$irc) = @_;
 	$Admin::public_functions->{bot_list_urls}={function=>\&bot_list_urls,regex=>'urls.*'};
 	$Admin::public_parsers->{bot_add_urls}={function=>\&bot_add_urls,regex=>'((((https?|ftp):\/\/)|www\.)(([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)|localhost|([a-zA-Z0-9\-]+\.)*[a-zA-Z0-9\-]+\.(com|net|org|info|biz|gov|name|edu|[a-zA-Z][a-zA-Z]))(:[0-9]+)?((\/|\?)[^ "]*[^ ,;\.:">)])?)'};
-	$dbh=DBI->connect("dbi:SQLite:dbname=Modules/db/urls.db","","");
+	$dbh=DBI->connect("dbi:SQLite:dbname=Modules/DB/urls.db","","");
 	$dbh->do("BEGIN TRANSACTION;");
 	$dbh->do("CREATE TABLE urls (id INTEGER PRIMARY KEY, user TEXT, channel TEXT, date TEXT, url TEXT);");
 	$dbh->do("COMMIT;");
+}
+
+sub unload {
+	delete($Admin::public_functions->{bot_list_urls});
+	delete($Admin::public_parsers->{bot_add_urls});
 }
 
 sub bot_list_urls {
@@ -21,7 +26,6 @@ sub bot_list_urls {
 	my @return;
 	my $sth=$dbh->prepare("SELECT user,channel,date,url FROM urls WHERE channel LIKE ? ORDER BY -id LIMIT 0,?");
 	my ($usr,$channel,$date,$url);
-	print "list_urls !!";
 	$sth->bind_columns( \$usr, \$channel , \$date, \$url );
 	if( my ($search) = $what =~/urls search (.*)/ )
 	{
@@ -48,7 +52,6 @@ sub bot_list_urls {
 	}
 	elsif( my ($chan) = $what =~/urls (#.*)/ )
 	{
-		print 1;
 		$sth->execute($chan,5);
 		while($sth->fetch())
 		{
@@ -59,7 +62,6 @@ sub bot_list_urls {
 	}
 	elsif ( my ($num,$chan) = $what =~/urls (\d*) (#.*)/ )
 	{
-		print 2;
 		$sth->execute($chan,min($num,10));
 		while($sth->fetch())
 		{
@@ -70,7 +72,6 @@ sub bot_list_urls {
 	}
 	elsif ( my ($num) = $what =~/urls (\d+)/)
 	{
-		print 3;
 		$sth->execute($dest,min($num,10));
 		while($sth->fetch())
 		{
@@ -80,7 +81,6 @@ sub bot_list_urls {
 	} 
 	elsif ( $what =~/urls.*/ )
 	{
-		print 4;
 		$sth->execute($dest,1);
 		while($sth->fetch())
 		{
@@ -88,13 +88,11 @@ sub bot_list_urls {
 			push(@return,$ligne);
 		}
 	}
-	print 5;
 	return @return;
 }
 
 sub bot_add_urls {
 	my($nick, $dest, $what)=@_;
-	print "ajout url !!";
 	my $regex=$Admin::public_parsers->{bot_add_urls}->{regex};
 	my ($url) = $what=~/$regex/ ;
 	my $sth=$dbh->prepare("INSERT INTO urls (url,user,channel,date) VALUES (?,?,?,datetime('now','localtime'));");

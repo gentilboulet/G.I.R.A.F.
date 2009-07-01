@@ -8,6 +8,12 @@ sub init {
 	$Admin::public_functions->{bot_roll_dice}={function=>\&bot_roll_dice,regex=>'dice (.*)'};
 }
 
+sub unload {
+	my ($kernel,$irc) = @_;
+	delete($Admin::public_functions->{bot_roll_dice});
+}
+
+
 sub bot_roll_dice {
 	my($nick, $dest, $what)=@_;
 	my @return;

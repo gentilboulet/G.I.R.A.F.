@@ -18,6 +18,12 @@ sub init {
 	$dbh->do("COMMIT;");
 }
 
+sub unload {
+	delete($Admin::public_functions->{bot_get_karma});
+	delete($Admin::public_parsers->{bot_karma_plusplus});
+	delete($Admin::public_parsers->{bot_karma_moinsmoins});
+}
+
 sub bot_get_karma 
 {
 	my($nick, $dest, $what)=@_;

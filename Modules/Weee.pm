@@ -10,6 +10,10 @@ sub init {
 	$Admin::public_parsers->{bot_weee}={function=>\&bot_weee,regex=>'(\B[<>/|_\\\]o[/<>|_\\\]\B)|(\B[</|_\\\>]{2}o)|(o[/<>|_\\\]{2}\B)'};
 }
 
+sub unload {
+	delete($Admin::public_parsers->{bot_weee});
+}
+
 sub bot_weee {
 	my($nick, $dest, $what)=@_;
 	my @return;

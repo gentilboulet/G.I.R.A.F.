@@ -29,7 +29,7 @@ GetOptions(
 	"botident=s", "botmodes=s", "botopcmd=s", "maxtries=i",
 	"botadmin=s", "logfile=s",  "debug=i",	  "triggers=s",
   )
-  or debug( "Error: Could not parse command line. Try $0 --help\n", 1 );
+  or debug( "Error: Could not parse command line. Try $0 --help", 1 );
 
 $botname = $opts{botnick};
 $triggers=$opts{triggers};
@@ -140,7 +140,7 @@ sub irc_disconnected
 {
 	if(!$quit)
 	{
-		debug( "Lost connection to server " . $opts{server} . ".\n" );
+		debug( "Lost connection to server " . $opts{server} . "." );
 		irc_reconnect( $_[KERNEL] );
 	}
 }
@@ -150,7 +150,7 @@ sub irc_error
 	if(!$quit)
 	{
 		my $err = $_[ARG0];
-		debug("Server error occurred! $err\n");
+		debug("Server error occurred! $err");
 		sleep 60;
 		irc_reconnect( $_[KERNEL] );
 	}
@@ -179,11 +179,6 @@ sub irc_public
 	my $channel = $where->[0];
 	debug("@$where:$nick : $what");
 	emit(Admin->public_msg( $nick, $channel, $what ) );
-	#my $regex=$triggers."reload";
-	#if ( $what =~ /^$regex$/ )
-	#{
-	#	reload_modules();
-	#}
 	undef;
 }
 
@@ -215,7 +210,7 @@ sub irc_notice
 	my ( $kernel, $sender, $who, $where, $what ) =
 	@_[ KERNEL, SENDER, ARG0, ARG1, ARG2 ];
 	my $nick = ( split /!/, $who )[0];
-	debug( " : $nick $what\n" );
+	debug( " : $nick $what" );
 }
 
 sub irc_part
@@ -268,7 +263,7 @@ sub sigint
 sub irc_socketerr
 {
 	my $err = $_[ARG0];
-	debug("Couldn't connect to server: $err\n");
+	debug("Couldn't connect to server: $err");
 	sleep 60;
 	irc_reconnect( $_[KERNEL] );
 }
@@ -291,7 +286,7 @@ sub _start
 
 sub _stop
 {
-	debug("STOP ?! \n");
+	debug("STOP ?! ");
 }
 
 sub bbcode
@@ -342,7 +337,7 @@ sub bbcode
 	my $bgcolor   = "bgcolor|bgc|color|c";
 	my $reverse   = "reverse|r";
 	
-	foreach my $i (0..4)
+	foreach my $i (0..10)
 	{
 		#bold
 		$msg_text =~ s/\[($bold)\](.*?)\[\/($bold)\]/\002$2\002/gi;
@@ -466,14 +461,6 @@ sub readconfig
 			}
 		}
 	}
-}
-
-sub reload_modules
-{
-	debug("Rechargement des modules start");
-	Admin->reload_modules;
-#	Reload->check;
-	debug("Rechargement des modules stop");
 }
 
 sub ts

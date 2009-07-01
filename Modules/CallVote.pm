@@ -23,6 +23,12 @@ sub init {
 	$Admin::on_nick_functions->{callvote_nick}={function=>\&callvote_nick};
 }
 
+sub unload {
+	delete($Admin::public_functions->{callvote_launch});
+	delete($Admin::public_functions->{callvote_status});
+	delete($Admin::public_functions->{callvote_vote});
+	delete($Admin::on_nick_functions->{callvote_nick});
+}
 
 sub callvote_launch {
 	my($nick, $dest, $what)=@_;

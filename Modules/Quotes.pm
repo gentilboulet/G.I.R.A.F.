@@ -17,6 +17,10 @@ sub init {
 	$dbh->do("COMMIT;");
 }
 
+sub unload {
+
+}
+
 sub connect_DBI {
 	my $dbh = DBI->connect('DBI:Oracle:payroll')
                 or die "le quartier général des informations est kaput : " . DBI->errstr;

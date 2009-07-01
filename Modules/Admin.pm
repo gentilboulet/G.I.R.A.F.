@@ -17,7 +17,6 @@ our $on_part_functions;
 our $on_quit_functions;
 our $public_parsers;
 our $private_parsers;
-our $module_list;
 our $dbh;
 
 
@@ -43,13 +42,18 @@ sub init {
 	$triggers=$set_triggers;
 	$public_functions->{bot_say}={function=>\&bot_say,regex=>'say (.*)'};
 	$public_functions->{bot_do}={function=>\&bot_do,regex=>'do (.*)'};
-	$public_functions->{bot_load_module}={function=>\&bot_load_module,regex=>'load (.*)'};
-	$public_functions->{bot_add_module}={function=>\&bot_add_module,regex=>'add module (.*)'};
+	$public_functions->{bot_load_module}={function=>\&bot_load_module,regex=>'module load (.+)'};
+	$public_functions->{bot_unload_module}={function=>\&bot_unload_module,regex=>'module unload (.+)'};
+	$public_functions->{bot_add_module}={function=>\&bot_add_module,regex=>'module add (.+)'};
+	$public_functions->{bot_del_module}={function=>\&bot_del_module,regex=>'module del (.+)'};
+	$public_functions->{bot_list_module}={function=>\&bot_list_module,regex=>'module list'};
 	$public_functions->{bot_quit}={function=>\&bot_quit,regex=>'quit(.*)'};
+	$public_functions->{bot_reload_modules}={function=>\&bot_reload_modules,regex=>'module reload'};
 
         $dbh=DBI->connect("dbi:SQLite:dbname=Modules/DB/modules.db","","");
-	$dbh->do("CREATE TABLE modules (autorun NUMERIC, file TEXT, name TEXT,session NUMERIC);");
-	$dbh->do("CREATE TABLE users (name TEXT PRIMARY KEY, privileges NUMERIC);");
+	$dbh->do("CREATE TABLE IF NOT EXISTS modules (autorun NUMERIC, file TEXT, name TEXT,session NUMERIC, loaded NUMERIC);");
+	$dbh->do("CREATE TABLE IF NOT EXISTS users (name TEXT PRIMARY KEY, privileges NUMERIC);");
+	$dbh->do("CREATE TABLE IF NOT EXISTS config (name TEXT PRIMARY KEY, value TEXT);");
 	$dbh->do("INSERT INTO users(name,privileges) VALUES('GentilBoulet',0);");
 
 	my $sth=$dbh->prepare("SELECT file,name FROM modules WHERE autorun>0");
@@ -61,6 +65,7 @@ sub init {
 		require($module);
 		eval "&".$module_name.'::init($Admin::kernel,$Admin::irc_session);';
 	}
+	$dbh->do("UPDATE modules SET loaded=1 WHERE autorun>0");
 	$kernel->yield("connect");
 }
 
@@ -137,11 +142,6 @@ sub public_msg
 
 }
 
-sub reload_modules
-{
-	Reload->check;
-}
-
 sub private_msg
 {
 	my ($classe, $nick, $who, $where, $what )=@_;
@@ -168,6 +168,26 @@ sub private_msg
 
 }
 
+sub set_param
+{
+	my ($param,$value)=@_;
+	my $sth=$dbh->prepare("INSERT OR REPLACE INTO config(name,value) VALUES(?,?)");
+	$sth->execute($param,$value);
+	return $param;
+}
+
+sub get_param
+{
+	my ($what)=@_;
+	my $value;
+	my $sth=$dbh->prepare("SELECT value FROM config WHERE name LIKE ?");
+	$sth->bind_columns(\$value);
+	$sth->execute($what);
+	$sth->fetch();
+	return $value;
+
+}
+
 sub bot_say {
 	my($nick, $dest, $what)=@_;
 	my @return;
@@ -188,28 +208,85 @@ sub bot_do {
 	return @return;
 }
 
+sub bot_reload_modules
+{
+	Giraf::debug('AACallVote start !!');
+	$Giraf::Reload::Debug=3;
+	Reload->check();
+	Giraf::debug('BBCallVote start !!');
+}
+
 sub bot_load_module {
 	my($nick, $dest, $what)=@_;
 	my @return;
-	my $regex= $triggers."load? (.*)";
-	my $sth=$dbh->prepare("SELECT COUNT(*),file,name FROM modules WHERE name LIKE ?");
-	my ($count,$module,$module_name);
-	$sth->bind_columns( \$count, \$module , \$module_name);
-	if( my ($txt) = $what=~/$regex/ )
+	my $regex= $triggers."module load (.+)";
+	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges >= 10000");
+        my $count;
+        $sth->bind_columns( \$count);
+	$sth->execute($nick);
+	$sth->fetch();
+	if($count > 0)
 	{
-		$sth->execute($txt);
-		$sth->fetch();
-		if($count > 0)
+
+		$sth=$dbh->prepare("SELECT COUNT(*),file,name FROM modules WHERE name LIKE ?");
+		my ($module,$module_name);
+		$sth->bind_columns( \$count, \$module , \$module_name);
+		if( my ($txt) = $what=~/$regex/ )
 		{
-			require($module);
-			eval "&".$module_name.'::init($Admin::kernel,$Admin::irc_session);';
-			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] chargé !'};
-			push(@return,$ligne);
+			$sth->execute($txt);
+			$sth->fetch();
+			if($count > 0)
+			{
+				require($module);
+				$sth=$dbh->prepare("UPDATE modules SET loaded=1 WHERE name LIKE ?");
+				$sth->execute($txt);
+				eval "&".$module_name.'::init($Admin::kernel,$Admin::irc_session);';
+				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] chargé !'};
+				push(@return,$ligne);
+			}
+			else
+			{
+				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] non trouve !'};
+				push(@return,$ligne);
+			}
 		}
-		else
+	}
+	return @return;
+}
+
+
+sub bot_unload_module {
+	my($nick, $dest, $what)=@_;
+	my @return;
+	my $regex= $triggers."module unload (.+)";
+	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges >= 10000");
+        my $count;
+        $sth->bind_columns( \$count);
+        $sth->execute($nick);
+        $sth->fetch();
+	if($count > 0)
+	{
+		$sth=$dbh->prepare("SELECT COUNT(*),file,name FROM modules WHERE name LIKE ?");
+		my ($module,$module_name);
+		$sth->bind_columns( \$count, \$module , \$module_name);
+		if( my ($txt) = $what=~/$regex/ )
 		{
-			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] non trouve !'};
-			push(@return,$ligne);
+			$sth->execute($txt);
+			$sth->fetch();
+			if($count > 0)
+			{
+				require($module);
+				$sth=$dbh->prepare("UPDATE modules SET loaded=0 WHERE name LIKE ?");
+				$sth->execute($txt);
+				eval "&".$module_name.'::unload();';
+				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] déchargé !'};
+				push(@return,$ligne);
+			}
+			else
+			{
+				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] non trouve !'};
+				push(@return,$ligne);
+			}
 		}
 	}
 	return @return;
@@ -219,7 +296,7 @@ sub bot_load_module {
 sub bot_add_module {
 	my($nick, $dest, $what)=@_;
 	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges < 1");
-	my $regex= $triggers."add module (.*) (.*\.pm) ([0-9]*)";
+	my $regex= $triggers."module add (.+) (.+\.pm) ([0-9]*)";
 	my $count;
 	my @return;
 	$sth->bind_columns( \$count);
@@ -245,13 +322,63 @@ sub bot_add_module {
 		}
 		else
 		{	
-			$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'."$name $file $autorun".'[/c] non ajoute ! Ligne indechiffrable !'};
+			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'."$name $file $autorun".'[/c] non ajoute ! Ligne indechiffrable !'};
 			push(@return,$ligne);
 		}
 
 	}
 	return @return
 }
+
+sub bot_del_module {
+	my($nick, $dest, $what)=@_;
+	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges >= 10000");
+	my $regex= $triggers."module de (.+))";
+	my $count;
+	my @return;
+	$sth->bind_columns( \$count);
+	$sth->execute($nick);
+	$sth->fetch();
+	if($count > 0)
+	{
+		$sth=$dbh->prepare("DELETE FROM modules WHERE name='?'");
+		if( my ($name) = $what=~/$regex/ )
+		{
+			$sth->execute($name);
+			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] retiré !'};
+			push(@return,$ligne);
+		}
+		else
+		{
+			$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'."$name $file $autorun".'[/c] non retiré ! Ligne indechiffrable !'};
+			push(@return,$ligne);
+		}
+
+	}
+	return @return
+
+}
+
+sub bot_list_module {
+	my($nick, $dest, $what)=@_;
+	my $sth=$dbh->prepare("SELECT name,autorun,session,loaded FROM modules");
+	my $regex= $triggers."module list";
+	my @return;
+	my $name; 
+	my $autorun;
+	my $session;
+	my $loaded;
+	$sth->bind_columns( \$name, \$autorun, \$session, \$loaded);
+	$sth->execute();
+	while($sth->fetch())
+	{
+		my $ligne= {action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] : autorun=[color=orange]'.$autorun.'[/color];session=[c=teal]'.$session.'[/c];loaded=[c=teal]'.$loaded.'[/c]'};
+		push(@return,$ligne);
+	}
+	return @return
+
+}
+
 
 sub bot_quit {
 	my($nick, $dest, $what)=@_;
@@ -284,7 +411,6 @@ sub bot_quit {
 			$kernel->signal( $kernel, 'POCOIRC_SHUTDOWN', $reason );
 		}
 	}
-
 	return @return
 }
 
