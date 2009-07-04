@@ -116,6 +116,26 @@ sub on_join {
 	return @return;
 }
 
+sub on_bot_quit {
+	my ($classe,$reason)=@_;
+        Giraf::set_quit();
+	$sth=$dbh->prepare("SELECT COUNT(*),file,name FROM modules WHERE loaded=1");
+	my ($count,$module,$module_name);
+	$sth->bind_columns( \$count, \$module , \$module_name);
+	$sth->execute();
+	while($sth->fetch())
+	{
+		require($module);
+		$sth=$dbh->prepare("UPDATE modules SET loaded=0 WHERE name LIKE ?");
+		$sth->execute($module_name);
+		eval "&".$module_name.'::unload();';
+                eval "&".$module_name.'::quit();'
+	}
+	$kernel->signal( $kernel, 'POCOIRC_SHUTDOWN', $reason );
+	return 0;
+
+}
+
 sub public_msg
 {
 	my ($classe, $nick, $channel, $what )=@_;
@@ -221,8 +241,8 @@ sub bot_load_module {
 	my @return;
 	my $regex= $triggers."module load (.+)";
 	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges >= 10000");
-        my $count;
-        $sth->bind_columns( \$count);
+	my $count;
+	$sth->bind_columns( \$count);
 	$sth->execute($nick);
 	$sth->fetch();
 	if($count > 0)
@@ -260,10 +280,10 @@ sub bot_unload_module {
 	my @return;
 	my $regex= $triggers."module unload (.+)";
 	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges >= 10000");
-        my $count;
-        $sth->bind_columns( \$count);
-        $sth->execute($nick);
-        $sth->fetch();
+	my $count;
+	$sth->bind_columns( \$count);
+	$sth->execute($nick);
+	$sth->fetch();
 	if($count > 0)
 	{
 		$sth=$dbh->prepare("SELECT COUNT(*),file,name FROM modules WHERE name LIKE ?");
@@ -295,7 +315,7 @@ sub bot_unload_module {
 
 sub bot_add_module {
 	my($nick, $dest, $what)=@_;
-	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges < 1");
+	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges >= 10000");
 	my $regex= $triggers."module add (.+) (.+\.pm) ([0-9]*)";
 	my $count;
 	my @return;
@@ -388,28 +408,15 @@ sub bot_quit {
 	$sth->bind_columns( \$count);
 	$sth->execute($nick);
 	$sth->fetch();
-	my $regex= $triggers."quit (.+)";
+	my $regex= $triggers."quit (\\S.*)";
 	if($count > 0)
 	{
-		$sth=$dbh->prepare("SELECT name FROM modules");
-		my ($module_name);
-		$sth->bind_columns( \$module_name);
-		$sth->execute();
-		while($sth->fetch() )
-		{
-			eval "&".$module_name.'::quit();'
-		}
-		\&Giraf::set_quit();
 		my $reason="All your bot are belong to us";
 		if($what=~/$regex/ )
 		{
 			$reason=$1;
-			$kernel->signal( $kernel, 'POCOIRC_SHUTDOWN', $reason );
 		}
-		else
-		{
-			$kernel->signal( $kernel, 'POCOIRC_SHUTDOWN', $reason );
-		}
+		Admin::on_bot_quit($reason);
 	}
 	return @return
 }

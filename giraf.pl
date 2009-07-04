@@ -248,7 +248,10 @@ sub irc_mode
 
 sub irc_reconnect
 {
-	$_[0]->post( $irc => connect => {} );
+	if(!$quit)
+	{
+		$_[0]->post( $irc => connect => {} );
+	}
 }
 
 sub sigint
@@ -256,16 +259,19 @@ sub sigint
 	my $kernel = $_[KERNEL];
 	set_quit();
 	$kernel->sig('INT');
-	$kernel->post( $irc => quit => "Adieu monde cruel!" );
 	$kernel->sig_handled();
+	Admin->on_bot_quit('Adieu monde cruel!');
 }
 
 sub irc_socketerr
 {
 	my $err = $_[ARG0];
-	debug("Couldn't connect to server: $err");
-	sleep 60;
-	irc_reconnect( $_[KERNEL] );
+	if(!$quit)
+	{
+		debug("Couldn't connect to server: $err");
+		sleep 60;
+		irc_reconnect( $_[KERNEL] );
+	}
 }
 
 sub _start
