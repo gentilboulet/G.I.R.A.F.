@@ -11,7 +11,9 @@ sub init {
 	my ($kernel,$irc) = @_;
 	$Admin::public_functions->{bot_search}={function=>\&bot_search,regex=>'search (.*)'};
 	$Admin::public_functions->{bot_searchn}={function=>\&bot_searchn,regex=>'searchn ([0-9]+) (.*)'};
-	Admin::set_param('Search_GoogleAPIURL','http://ajax.googleapis.com/ajax/services/search/web?v=1.0');
+	#http://code.google.com/intl/fr/apis/ajaxsearch/documentation/reference.html#_restUrlBase
+	Admin::set_param('Search_GoogleAPIURL','http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large');
+	Admin::set_param('Search_GoogleSafeSearch','off');
 	$ua=LWP::UserAgent->new;
 }
 
@@ -25,11 +27,12 @@ sub bot_search {
 	my $referer=Admin::get_param('Search_referer');
 	my $GoogleAPIKey=Admin::get_param('Search_GoogleAPIKey');
 	my $GoogleAPIUrl=Admin::get_param('Search_GoogleAPIURL');
+	my $GoogleSafeSearch=Admin::get_param('Search_GoogleSafeSearch');
 	if( my ($search_str)= $what=~/search (.*)/)
 	{
 		$GoogleAPIUrl=$GoogleAPIUrl.'&key='.$GoogleAPIKey if defined $GoogleAPIKey;
+		$GoogleAPIUrl =$GoogleAPIUrl.'&safe='.$GoogleSafeSearch;
 		$GoogleAPIUrl =$GoogleAPIUrl.'&q='.$search_str;
-		print 'Request url : '.$GoogleAPIUrl."\n";
 		my $request=$ua->get($GoogleAPIUrl,referer=>$referer);
 	        if($request->is_success)
 		{
@@ -40,7 +43,6 @@ sub bot_search {
 			if($data=~m/$regex_single/g)
 			{
 				my ($unescapedUrl,$url,$visibleUrl,$cacheUrl,$title,$titleNoFormatting,$content) = ($1,$2,$3,$4,$5,$6,$7);
-#				print "unescapedUrl=$unescapedUrl\nurl=$url\nvisibleUrl=$visibleUrl\ncacheUrl=$cacheUrl\ntitle=$title\ntitleNoFormatting=$titleNoFormatting\ncontent=$content\n";
 				my $ligne= {action =>"MSG",dest=>$dest,msg=>'[b]'.$titleNoFormatting.'[/b] - [c=teal]'.json_decode($unescapedUrl).'[/c]'};
 				push(@return,$ligne);
 			}
@@ -60,11 +62,12 @@ sub bot_searchn {
         my $referer=Admin::get_param('Search_referer');
         my $GoogleAPIKey=Admin::get_param('Search_GoogleAPIKey');
         my $GoogleAPIUrl=Admin::get_param('Search_GoogleAPIURL');
+	my $GoogleSafeSearch=Admin::get_param('Search_GoogleSafeSearch');
         if( my ($num,$search_str)= $what=~/searchn ([0-9]+) (.*)/)
         {
                 $GoogleAPIUrl=$GoogleAPIUrl.'&key='.$GoogleAPIKey if defined $GoogleAPIKey;
+		$GoogleAPIUrl =$GoogleAPIUrl.'&safe='.$GoogleSafeSearch;
                 $GoogleAPIUrl =$GoogleAPIUrl.'&q='.$search_str;
-                print 'Request url : '.$GoogleAPIUrl."\n";
                 my $request=$ua->get($GoogleAPIUrl,referer=>$referer);
                 if($request->is_success)
                 {
@@ -75,7 +78,6 @@ sub bot_searchn {
                         while($data=~m/$regex_single/g && $matchednum<=4 && $matchednum < $num)
                         {
 				$matchednum++;		
-				print "num=$num,matchednum=$matchednum\n";
                                 my ($unescapedUrl,$url,$visibleUrl,$cacheUrl,$title,$titleNoFormatting,$content) = ($1,$2,$3,$4,$5,$6,$7);
                                 my $ligne= {action =>"MSG",dest=>$dest,msg=>'[c=purple]'.$matchednum.'[/c] : [b]'.$titleNoFormatting.'[/b] - [c=teal]'.json_decode($unescapedUrl).'[/c]'};
                                 push(@return,$ligne);
@@ -93,10 +95,10 @@ sub bot_searchn {
 
 sub json_decode {
 	my ($data)=@_;
-	$data=~s/\\\\u003e/\>/g;
-	$data=~s/\\\\u003d/=/g;
-	$data=~s/\\\\u0026/\\\&/g;
-	$data=~s/\\\\u003c/\</g;
+	$data=~s/\\u003e/\>/g;
+	$data=~s/\\u003d/=/g;
+	$data=~s/\\u0026/\\\&/g;
+	$data=~s/\\u003c/\</g;
 	return $data;
 }
 1;
