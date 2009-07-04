@@ -17,7 +17,7 @@ sub init {
 	my ($ker,$irc_session) = @_;
 	$kernel=$ker;
 	$irc=$irc_session;
-	$Admin::public_functions->{callvote_launch}={function=>\&callvote_launch,regex=>'callvote (.*) \?([ ]*)( [0-9]+)?'};
+	$Admin::public_functions->{callvote_launch}={function=>\&callvote_launch,regex=>'callvote (.*) \?\s*( +[0-9]+)?'};
 	$Admin::public_functions->{callvote_status}={function=>\&callvote_status,regex=>'callvote status'};
 	$Admin::public_functions->{callvote_vote}={function=>\&callvote_vote,regex=>'[fF][12]([ ]*)'};
 	$Admin::on_nick_functions->{callvote_nick}={function=>\&callvote_nick};
@@ -36,10 +36,14 @@ sub callvote_launch {
 	$dest=lc $dest;
 	if( $votes->{$dest}->{en_cours}==0)
 	{
-		my ($v)=$what=~/callvote (.*) \?/ ;
-		my ($d)=$what=~/callvote .* \? ([0-9]+)?/;
+		my ($v)=$what=~/callvote\s+(\S.*?\S?)\s+\?/ ;
+		my ($d)=$what=~/callvote\s+\S.*?\S?\s+\?\s+([0-9]+)?/;
 		if($d)
 		{
+			if($d<15)
+			{
+				$d=15;
+			}
 			$votes->{$dest}->{delay}=min(300,$d);
 		}
 		else
@@ -178,19 +182,25 @@ sub vote_end {
 	$votes->{$dest}->{en_cours}=0;
 
 	my @return;
+	if( ($oui+$non)>1)
+	{
+		$votants="s";
+	}
 	if($oui==$non)
 	{
-		my $ligne={ action =>"MSG",dest=>$dest,msg=>"[c=teal]$vote [/c] Peut-etre (egalite, ".($oui+$non)." votants)"};
+		my $ligne={ action =>"MSG",dest=>$dest,msg=>"[c=teal]$vote [/c] Peut-etre (egalite, ".($oui+$non)." votant$votants)"};
 		push(@return,$ligne);
 	}
 	elsif($oui>$non)
 	{
-		my $ligne={ action =>"MSG",dest=>$dest,msg=>"[c=teal]$vote [/c] Oui (".(100*$oui/($oui+$non))."% de ".($oui+$non)." votants)"};
+		my $ratio=sprintf("%.2f",(100*$oui/($oui+$non)));
+		my $ligne={ action =>"MSG",dest=>$dest,msg=>"[c=teal]$vote [/c] Oui (".$ratio."% de ".($oui+$non)." votant$votants)"};
 		push(@return,$ligne);
 	}
 	elsif($oui<$non)
 	{
-		my $ligne={ action =>"MSG",dest=>$dest,msg=>"[c=teal]$vote [/c] Non (".(100*$non/($oui+$non))."% de ".($oui+$non)." votants)"};
+		my $ratio=sprintf("%.2f",(100*$non/($oui+$non)));
+		my $ligne={ action =>"MSG",dest=>$dest,msg=>"[c=teal]$vote [/c] Non (".$ratio."% de ".($oui+$non)." votant$votants)"};
 		push(@return,$ligne);
 	}
 	Giraf::emit(@return);
