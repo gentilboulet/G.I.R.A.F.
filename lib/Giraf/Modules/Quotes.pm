@@ -10,9 +10,9 @@ use Giraf::Config;
 
 use DBI;
 
-our $dbh;
-
-my $tbl_quote = 'mod_quotes_quote';
+# Private vars
+our $_dbh;
+our $_tbl_quote = 'mod_quotes_quote';
 
 sub init {
 	my ($kernel,$irc) = @_;
@@ -20,10 +20,10 @@ sub init {
 	#$Admin::public_parsers->{bot_karma_plusplus}={function=>\&bot_karma_pp,regex=>'(\w+)\+\+'};
 	#$Admin::public_parsers->{bot_karma_moinsmoins}={function=>\&bot_karma_mm,regex=>'(\w+)--'};
 
-	$dbh=DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
-	$dbh->do("BEGIN TRANSACTION;");
-	$dbh->do("CREATE TABLE $tbl_quote (numero INTEGER, channel TEXT, quote TEXT , date TEXT, quoteur TEXT);");
-	$dbh->do("COMMIT;");
+	$_dbh=DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
+	$_dbh->do("BEGIN TRANSACTION;");
+	$_dbh->do("CREATE TABLE $_tbl_quote (numero INTEGER, channel TEXT, quote TEXT , date TEXT, quoteur TEXT);");
+	$_dbh->do("COMMIT;");
 }
 
 sub unload {
@@ -31,16 +31,16 @@ sub unload {
 }
 
 #sub connect_DBI {
-#	my $dbh = DBI->connect('DBI:Oracle:payroll')
+#	my $_dbh = DBI->connect('DBI:Oracle:payroll')
 #                or die "le quartier général des informations est kaput : " . DBI->errstr;
-#	return $dbh;
+#	return $_dbh;
 #}
 
 sub getNb {
-	my ( $channel, $dbh) = @_;
+	my ( $channel, $_dbh) = @_;
 
-	my $sth = $dbh->prepare("SELECT * FROM $tbl_quote WHERE channel = ?")
-		or die "j'arrive pas à préparer un modèle pour le QG des infos (n00b) : " . $dbh->errstr;
+	my $sth = $_dbh->prepare("SELECT * FROM $_tbl_quote WHERE channel = ?")
+		or die "j'arrive pas à préparer un modèle pour le QG des infos (n00b) : " . $_dbh->errstr;
 	$sth->execute($channel);
 	return $sth->rows + 1;
 }
@@ -51,10 +51,10 @@ sub addquote {
 	# modèle d'insertion d'une quote à la con : le numéro, le channel (qui forment une clé)
 	# puis la date (évitons les 32/14/-2076), puis le con qui quote, puis la quote de merde
 	
-	my $sth = $dbh->prepare("INSERT INTO $tbl_quote(num, channel, date, who, what) VALUES ?,?,DATETIME('NOW','LOCALTIME'),?,?")
-                or die "j'arrive pas à préparer un modèle pour le QG des infos (n00b) : " . $dbh->errstr;
+	my $sth = $_dbh->prepare("INSERT INTO $_tbl_quote(num, channel, date, who, what) VALUES ?,?,DATETIME('NOW','LOCALTIME'),?,?")
+                or die "j'arrive pas à préparer un modèle pour le QG des infos (n00b) : " . $_dbh->errstr;
 
-	$num = this->getNb( $channel, $dbh );
+	$num = this->getNb( $channel, $_dbh );
 	$sth->execute($num, $channel, $who, $what) or return 0;
 
 	#%tab{$chan}=%tab{$chan}+1;
@@ -65,10 +65,10 @@ sub addquote {
 sub searchquote {
 	my ( $classe, $channel, $what ) = @_;
 	
-	#my $dbh = this->connect_DBI();
+	#my $_dbh = this->connect_DBI();
 
-	my $sth = $dbh->prepare("SELECT * FROM $tbl_quote WHERE channel = ? AND quote LIKE ?")
-                or die "j'arrive pas à préparer un modèle pour le QG des infos (n00b) : " . $dbh->errstr;
+	my $sth = $_dbh->prepare("SELECT * FROM $_tbl_quote WHERE channel = ? AND quote LIKE ?")
+                or die "j'arrive pas à préparer un modèle pour le QG des infos (n00b) : " . $_dbh->errstr;
 
 	$sth->execute($channel, $what);
 
@@ -86,8 +86,8 @@ sub searchquote {
 sub getquote {
 	my ( $classe, $channel, $num ) = @_;
 	
-	my $sth = $dbh->prepare("SELECT * FROM $tbl_quote WHERE numero = ?")
-                or die "j'arrive pas à préparer un modèle pour le QG des infos (n00b) : " . $dbh->errstr;
+	my $sth = $_dbh->prepare("SELECT * FROM $_tbl_quote WHERE numero = ?")
+                or die "j'arrive pas à préparer un modèle pour le QG des infos (n00b) : " . $_dbh->errstr;
     
     $sth->execute($num);
     

@@ -8,8 +8,9 @@ use warnings;
 
 use LWP::UserAgent;
 
-our $dbh;
-our $ua;
+# Private vars
+our $_dbh;
+our $_ua;
 
 sub init {
 	my ($kernel,$irc) = @_;
@@ -18,7 +19,7 @@ sub init {
 	#http://code.google.com/intl/fr/apis/ajaxsearch/documentation/reference.html#_restUrlBase
 	Admin::set_param('Search_GoogleAPIURL','http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large');
 	Admin::set_param('Search_GoogleSafeSearch','off');
-	$ua=LWP::UserAgent->new;
+	$_ua=LWP::UserAgent->new;
 }
 
 sub unload {
@@ -37,7 +38,7 @@ sub bot_search {
 		$GoogleAPIUrl=$GoogleAPIUrl.'&key='.$GoogleAPIKey if defined $GoogleAPIKey;
 		$GoogleAPIUrl =$GoogleAPIUrl.'&safe='.$GoogleSafeSearch;
 		$GoogleAPIUrl =$GoogleAPIUrl.'&q='.$search_str;
-		my $request=$ua->get($GoogleAPIUrl,referer=>$referer);
+		my $request=$_ua->get($GoogleAPIUrl,referer=>$referer);
 	        if($request->is_success)
 		{
 			my $data=$request->content;
@@ -72,7 +73,7 @@ sub bot_searchn {
                 $GoogleAPIUrl=$GoogleAPIUrl.'&key='.$GoogleAPIKey if defined $GoogleAPIKey;
 		$GoogleAPIUrl =$GoogleAPIUrl.'&safe='.$GoogleSafeSearch;
                 $GoogleAPIUrl =$GoogleAPIUrl.'&q='.$search_str;
-                my $request=$ua->get($GoogleAPIUrl,referer=>$referer);
+                my $request=$_ua->get($GoogleAPIUrl,referer=>$referer);
                 if($request->is_success)
                 {
                         my $data=$request->content;

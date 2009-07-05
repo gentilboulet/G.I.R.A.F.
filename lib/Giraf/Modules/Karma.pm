@@ -11,9 +11,9 @@ use Giraf::Config;
 use DBI;
 use List::Util qw[min max];
 
-our $dbh;
-
-my $tbl_karm = 'mod_karma_karma';
+# Private vars
+our $_dbh;
+our $_tbl_karm = 'mod_karma_karma';
 
 sub init {
 	my ($kernel,$irc) = @_;
@@ -21,10 +21,10 @@ sub init {
 	$Admin::public_parsers->{bot_karma_plusplus}={function=>\&bot_karma_pp,regex=>'(\w+)\+\+'};
 	$Admin::public_parsers->{bot_karma_moinsmoins}={function=>\&bot_karma_mm,regex=>'(\w+)--'};
 
-	$dbh=DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
-	$dbh->do("BEGIN TRANSACTION;");
-	$dbh->do("CREATE TABLE $tbl_karma (karma INTEGER , keyword TEXT UNIQUE);");
-	$dbh->do("COMMIT;");
+	$_dbh=DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
+	$_dbh->do("BEGIN TRANSACTION;");
+	$_dbh->do("CREATE TABLE $_tbl_karma (karma INTEGER , keyword TEXT UNIQUE);");
+	$_dbh->do("COMMIT;");
 }
 
 sub unload {
@@ -38,7 +38,7 @@ sub bot_get_karma
 	my($nick, $dest, $what)=@_;
 	my @return;
 	my $karma;
-	my $sth=$dbh->prepare("SELECT karma FROM $tbl_$tbl_karma WHERE keyword LIKE ?");
+	my $sth=$_dbh->prepare("SELECT karma FROM $_tbl_$_tbl_karma WHERE keyword LIKE ?");
 	$sth->bind_columns( \$karma );
 	if( my ($kw) = $what =~/karma show (\w+).*/)
 	{
@@ -103,12 +103,12 @@ sub bot_get_karma
 
 sub bot_karma_pp {
 	my($nick, $dest, $what)=@_;
-	my $sth=$dbh->prepare("INSERT INTO $tbl_karma (keyword,karma) VALUES (?,0);");
+	my $sth=$_dbh->prepare("INSERT INTO $_tbl_karma (keyword,karma) VALUES (?,0);");
 	my ($kw) = $what =~/(\w+)\+\+/ ;
 	if($nick ne $kw)
 	{
 		$sth->execute($kw);
-		$sth=$dbh->prepare("UPDATE $tbl_karma SET karma=karma+1 WHERE keyword LIKE ?");
+		$sth=$_dbh->prepare("UPDATE $_tbl_karma SET karma=karma+1 WHERE keyword LIKE ?");
 		$sth->execute($kw);
 	}
 	return @return;
@@ -116,12 +116,12 @@ sub bot_karma_pp {
 
 sub bot_karma_mm {
 	my($nick, $dest, $what)=@_;
-	my $sth=$dbh->prepare("INSERT INTO $tbl_karma (keyword,karma) VALUES (?,0);");
+	my $sth=$_dbh->prepare("INSERT INTO $_tbl_karma (keyword,karma) VALUES (?,0);");
 	my ($kw) = $what =~/(\w+)--/ ;
 	if($nick ne $kw)
 	{
 		$sth->execute($kw);
-		$sth=$dbh->prepare("UPDATE $tbl_karma SET karma=karma-1 WHERE keyword LIKE ?");
+		$sth=$_dbh->prepare("UPDATE $_tbl_karma SET karma=karma-1 WHERE keyword LIKE ?");
 		$sth->execute($kw);
 	}
 	return @return;
@@ -129,7 +129,7 @@ sub bot_karma_mm {
 
 
 sub quit {
-	$dbh->disconnect();
+	$_dbh->disconnect();
 }
 
 1;

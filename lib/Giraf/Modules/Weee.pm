@@ -6,8 +6,8 @@ package Giraf::Modules::Weee;
 use strict;
 use warnings;
 
-my @ovations=(['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/','\\\\o','o//'], ['<o/'],['\\o>'],['\o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/'] );
-
+# Private vars
+our @_ovations=(['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/','\\\\o','o//'], ['<o/'],['\\o>'],['\o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/'] );
 
 sub init {
 	my ($kernel,$irc) = @_;
@@ -21,8 +21,8 @@ sub unload {
 sub bot_weee {
 	my($nick, $dest, $what)=@_;
 	my @return;
-	my $rand=int(rand(scalar(@ovations)));
-	my $ref=$ovations[$rand];
+	my $rand=int(rand(scalar(@_ovations)));
+	my $ref=$_ovations[$rand];
 	foreach my $e (@$ref)
 	{
 		my $ligne={ action =>"MSG",dest=>$dest,msg=>"$e"};
