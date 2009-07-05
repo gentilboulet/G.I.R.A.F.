@@ -5,16 +5,17 @@ package Giraf::Modules::Dice;
 use strict;
 use warnings;
 
-use Giraf::Modules::Admin;
+use Giraf::Admin;
 
 sub init {
 	my ($kernel,$irc) = @_;
-	$Admin::public_functions->{bot_roll_dice}={function=>\&bot_roll_dice,regex=>'dice (.*)'};
+
+	$Giraf::Admin::public_functions->{bot_roll_dice}={function=>\&bot_roll_dice,regex=>'dice (.*)'};
 }
 
 sub unload {
 	my ($kernel,$irc) = @_;
-	delete($Admin::public_functions->{bot_roll_dice});
+	delete($Giraf::Admin::public_functions->{bot_roll_dice});
 }
 
 

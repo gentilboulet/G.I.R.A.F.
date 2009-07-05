@@ -6,16 +6,18 @@ package Giraf::Modules::Weee;
 use strict;
 use warnings;
 
+use Giraf::Admin;
+
 # Private vars
 our @_ovations=(['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/','\\\\o','o//'], ['<o/'],['\\o>'],['\o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/'] );
 
 sub init {
 	my ($kernel,$irc) = @_;
-	$Giraf::Modules::Admin::public_parsers->{bot_weee}={function=>\&bot_weee,regex=>'(\B[<>/|_\\\]o[/<>|_\\\]\B)|(\B[</|_\\\>]{2}o)|(o[/<>|_\\\]{2}\B)'};
+	$Giraf::Admin::public_parsers->{bot_weee}={function=>\&bot_weee,regex=>'(\B[<>/|_\\\]o[/<>|_\\\]\B)|(\B[</|_\\\>]{2}o)|(o[/<>|_\\\]{2}\B)'};
 }
 
 sub unload {
-	delete($Giraf::Modules::Admin::public_parsers->{bot_weee});
+	delete($Giraf::Admin::public_parsers->{bot_weee});
 }
 
 sub bot_weee {

@@ -5,8 +5,8 @@ use strict;
 use warnings;
 
 use Giraf::Config;
-use Giraf::Modules::Chan;
-use Giraf::Modules::Admin;
+use Giraf::Chan;
+use Giraf::Admin;
 
 use POSIX;
 use POE qw(Component::IRC);
@@ -29,7 +29,7 @@ sub init {
 	$botname = Giraf::Config::get('botnick');
 	$triggers = Giraf::Config::get('triggers');
 
-	#Giraf::Modules::Admin->init_sessions();
+	#Giraf::Admin->init_sessions();
 
 	return 1;
 }
@@ -89,7 +89,7 @@ sub irc_001
 	# In any irc_* events SENDER will be the PoCo-IRC session
 	foreach my $nom ( @{ Giraf::Config::get('botchan') } )
 	{
-		Giraf::Modules::Chan->join($nom);
+		Giraf::Chan->join($nom);
 	}
 	undef;
 }
@@ -99,7 +99,7 @@ sub irc_433
 	my ($kernel) = $_[KERNEL];
 	$botname = "Mr_Bobby";
 	$kernel->post( $irc => nick => $botname );
-	Giraf::Modules::Chan->init( $kernel, $irc, $botname );
+	Giraf::Chan->init( $kernel, $irc, $botname );
 	debug($botname);
 	sleep 1;
 }
@@ -159,7 +159,7 @@ sub irc_join
 {
 	my ( $kernel, $sender, $who, $where ) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
 	my $nick = ( split /!/, $who )[0];
-	Giraf::Modules::Chan->add_user( $where, $nick );
+	Giraf::Chan->add_user( $where, $nick );
 	debug("$nick join $where");
 }
 
@@ -168,7 +168,7 @@ sub irc_msg
 	my ( $kernel, $sender, $who, $where, $what ) = @_[ KERNEL, SENDER, ARG0, ARG1, ARG2 ];
 	my $nick = ( split /!/, $who )[0];
 	debug("@$where:$nick : $what");
-	emit(Giraf::Modules::Admin->private_msg( $nick, $who, $where, $what ) );
+	emit(Giraf::Admin->private_msg( $nick, $who, $where, $what ) );
 }
 
 sub irc_public
@@ -177,7 +177,7 @@ sub irc_public
 	my $nick = ( split /!/, $who )[0];
 	my $channel = $where->[0];
 	debug("@$where:$nick : $what");
-	emit(Giraf::Modules::Admin->public_msg( $nick, $channel, $what ) );
+	emit(Giraf::Admin->public_msg( $nick, $channel, $what ) );
 	undef;
 }
 
@@ -191,7 +191,7 @@ sub irc_names
 	foreach my $k (@users_list)
 	{
 		debug( "Sur " . $chan . " il y a {" . $k . "}" );
-		Giraf::Modules::Chan->add_user( $chan, $k );
+		Giraf::Chan->add_user( $chan, $k );
 	}
 }
 
@@ -200,8 +200,8 @@ sub irc_nick
 	my ( $kernel, $sender, $who, $new_nick ) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
 	my $nick = ( split /!/, $who )[0];
 	debug("nick_user($nick,$new_nick);"); 
-	Giraf::Modules::Chan->nick_user( $nick, $new_nick );
-	emit(Giraf::Modules::Admin->on_nick( $nick, $new_nick ) );
+	Giraf::Chan->nick_user( $nick, $new_nick );
+	emit(Giraf::Admin->on_nick( $nick, $new_nick ) );
 }
 
 sub irc_notice
@@ -216,7 +216,7 @@ sub irc_part
 {
 	my ( $kernel, $sender, $who, $where ) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
 	my $nick = ( split /!/, $who )[0];
-	Giraf::Modules::Chan->part_user( $where, $nick );
+	Giraf::Chan->part_user( $where, $nick );
 	debug("$nick part $where");
 }
 
@@ -224,7 +224,7 @@ sub irc_quit
 {
 	my ( $kernel, $sender, $who, $message ) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
 	my $nick = ( split /!/, $who )[0];
-	Giraf::Modules::Chan->quit_user($who);
+	Giraf::Chan->quit_user($who);
 	debug("$nick quit : $message");
 }
 
@@ -235,12 +235,12 @@ sub irc_mode
 	if( $what =~/^#.*/ )
 	{
 		debug("chan_mode : $what,$mode_string,$args");
-		Giraf::Modules::Chan->chan_mode($what,$mode_string,$args);
+		Giraf::Chan->chan_mode($what,$mode_string,$args);
 	}
 	else
 	{
 		debug("user_mode : $what,$mode_string,$args");
-		Giraf::Modules::Chan->user_mode($what,$mode_string,$args);
+		Giraf::Chan->user_mode($what,$mode_string,$args);
 	}
 
 }
@@ -259,7 +259,7 @@ sub sigint
 	set_quit();
 	$kernel->sig('INT');
 	$kernel->sig_handled();
-	Giraf::Modules::Admin->on_bot_quit('Adieu monde cruel!');
+	Giraf::Admin->on_bot_quit('Adieu monde cruel!');
 }
 
 sub irc_socketerr
@@ -283,8 +283,8 @@ sub _start
 	$kernel->post( $irc_session => register => 'all' );
 	$kernel->post( $irc_session => connect => {} );
 	undef;
-	Giraf::Modules::Chan->init( $kernel,  $irc ,$botname);
-	Giraf::Modules::Admin->init( $kernel, $irc ,$triggers);
+	Giraf::Chan->init( $kernel,  $irc ,$botname);
+	Giraf::Admin->init( $kernel, $irc ,$triggers);
 	$kernel->post ($irc_session =>  'privmsg' => nickserv => "IDENTIFY ".Giraf::Config::get('botpass'));
 	$kernel->sig( INT => "sigint" );
 }

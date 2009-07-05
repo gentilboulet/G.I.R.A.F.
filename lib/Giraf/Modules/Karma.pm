@@ -6,6 +6,7 @@ package Giraf::Modules::Karma;
 use strict;
 use warnings;
 
+use Giraf::Admin;
 use Giraf::Config;
 
 use DBI;
@@ -17,9 +18,9 @@ our $_tbl_karm = 'mod_karma_karma';
 
 sub init {
 	my ($kernel,$irc) = @_;
-	$Admin::public_functions->{bot_get_karma}={function=>\&bot_get_karma,regex=>'karma.*'};
-	$Admin::public_parsers->{bot_karma_plusplus}={function=>\&bot_karma_pp,regex=>'(\w+)\+\+'};
-	$Admin::public_parsers->{bot_karma_moinsmoins}={function=>\&bot_karma_mm,regex=>'(\w+)--'};
+	$Giraf::Admin::public_functions->{bot_get_karma}={function=>\&bot_get_karma,regex=>'karma.*'};
+	$Giraf::Admin::public_parsers->{bot_karma_plusplus}={function=>\&bot_karma_pp,regex=>'(\w+)\+\+'};
+	$Giraf::Admin::public_parsers->{bot_karma_moinsmoins}={function=>\&bot_karma_mm,regex=>'(\w+)--'};
 
 	$_dbh=DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
 	$_dbh->do("BEGIN TRANSACTION;");
@@ -28,9 +29,9 @@ sub init {
 }
 
 sub unload {
-	delete($Admin::public_functions->{bot_get_karma});
-	delete($Admin::public_parsers->{bot_karma_plusplus});
-	delete($Admin::public_parsers->{bot_karma_moinsmoins});
+	delete($Giraf::Admin::public_functions->{bot_get_karma});
+	delete($Giraf::Admin::public_parsers->{bot_karma_plusplus});
+	delete($Giraf::Admin::public_parsers->{bot_karma_moinsmoins});
 }
 
 sub bot_get_karma 

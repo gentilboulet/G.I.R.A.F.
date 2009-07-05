@@ -6,6 +6,7 @@ use strict;
 use warnings;
 
 use Giraf::Config;
+use Giraf::Admin;
 
 use DBI;
 
@@ -35,19 +36,19 @@ sub init {
 		$_advices->{regex}=$_advices->{regex}."|".$regex;
 		$_advices->{$id}={name=>$name,regex=>$regex,color=>$color};
 	}
-	$Admin::public_functions->{bot_advice}={function=>\&bot_advice,regex=>$_advices->{regex}.'(\s+(\d+))?'};
-	$Admin::public_functions->{bot_advice_suggest}={function=>\&bot_advice_suggest,regex=>$_advices->{regex}.'\s+suggest\s+.+'};
-	$Admin::public_functions->{bot_advice_validate}={function=>\&bot_advice_validate,regex=>$_advices->{regex}.'\s+validate(\s+(\d+))?'};
-	$Admin::public_functions->{bot_advice_stats}={function=>\&bot_advice_stats,regex=>'advice\s+stats'};
-#	$Admin::public_functions->{bot_advice_new}={function=>\&bot_advice_new,regex=>'advice\s(.+)'};
+	$Giraf::Admin::public_functions->{bot_advice}={function=>\&bot_advice,regex=>$_advices->{regex}.'(\s+(\d+))?'};
+	$Giraf::Admin::public_functions->{bot_advice_suggest}={function=>\&bot_advice_suggest,regex=>$_advices->{regex}.'\s+suggest\s+.+'};
+	$Giraf::Admin::public_functions->{bot_advice_validate}={function=>\&bot_advice_validate,regex=>$_advices->{regex}.'\s+validate(\s+(\d+))?'};
+	$Giraf::Admin::public_functions->{bot_advice_stats}={function=>\&bot_advice_stats,regex=>'advice\s+stats'};
+#	$Giraf::Admin::public_functions->{bot_advice_new}={function=>\&bot_advice_new,regex=>'advice\s(.+)'};
 }
 
 sub unload {
-	delete($Admin::public_functions->{bot_advice});
-	delete($Admin::public_functions->{bot_advice_suggest});
-	delete($Admin::public_functions->{bot_advice_validate});
-	delete($Admin::public_functions->{bot_advice_stats});
-#	delete($Admin::public_functions->{bot_advice_new});
+	delete($Giraf::Admin::public_functions->{bot_advice});
+	delete($Giraf::Admin::public_functions->{bot_advice_suggest});
+	delete($Giraf::Admin::public_functions->{bot_advice_validate});
+	delete($Giraf::Admin::public_functions->{bot_advice_stats});
+#	delete($Giraf::Admin::public_functions->{bot_advice_new});
 }
 
 sub bot_advice_new {

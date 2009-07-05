@@ -6,6 +6,8 @@ package Giraf::Modules::CallVote;
 use strict;
 use warnings;
 
+use Giraf::Admin;
+
 use List::Util qw[min max];
 use POE;
 
@@ -16,17 +18,17 @@ our $_votes;
 sub init {
 	my ($ker,$irc_session) = @_;
 	$_kernel=$ker;
-	$Admin::public_functions->{callvote_launch}={function=>\&callvote_launch,regex=>'callvote (.*) \?\s*( +[0-9]+)?'};
-	$Admin::public_functions->{callvote_status}={function=>\&callvote_status,regex=>'callvote status'};
-	$Admin::public_functions->{callvote_vote}={function=>\&callvote_vote,regex=>'[fF][12]([ ]*)'};
-	$Admin::on_nick_functions->{callvote_nick}={function=>\&callvote_nick};
+	$Giraf::Admin::public_functions->{callvote_launch}={function=>\&callvote_launch,regex=>'callvote (.*) \?\s*( +[0-9]+)?'};
+	$Giraf::Admin::public_functions->{callvote_status}={function=>\&callvote_status,regex=>'callvote status'};
+	$Giraf::Admin::public_functions->{callvote_vote}={function=>\&callvote_vote,regex=>'[fF][12]([ ]*)'};
+	$Giraf::Admin::on_nick_functions->{callvote_nick}={function=>\&callvote_nick};
 }
 
 sub unload {
-	delete($Admin::public_functions->{callvote_launch});
-	delete($Admin::public_functions->{callvote_status});
-	delete($Admin::public_functions->{callvote_vote});
-	delete($Admin::on_nick_functions->{callvote_nick});
+	delete($Giraf::Admin::public_functions->{callvote_launch});
+	delete($Giraf::Admin::public_functions->{callvote_status});
+	delete($Giraf::Admin::public_functions->{callvote_vote});
+	delete($Giraf::Admin::on_nick_functions->{callvote_nick});
 }
 
 sub callvote_launch {

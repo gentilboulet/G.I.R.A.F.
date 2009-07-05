@@ -6,6 +6,7 @@ package Giraf::Modules::Urls;
 use strict;
 use warnings;
 
+use Giraf::Admin;
 use Giraf::Config;
 
 use DBI;
@@ -17,8 +18,8 @@ our $_tbl_urls = 'mod_urls_urls';
 
 sub init {
 	my ($kernel,$irc) = @_;
-	$Admin::public_functions->{bot_list_urls}={function=>\&bot_list_urls,regex=>'urls.*'};
-	$Admin::public_parsers->{bot_add_urls}={function=>\&bot_add_urls,regex=>'((((https?|ftp):\/\/)|www\.)(([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)|localhost|([a-zA-Z0-9\-]+\.)*[a-zA-Z0-9\-]+\.(com|net|org|info|biz|gov|name|edu|[a-zA-Z][a-zA-Z]))(:[0-9]+)?((\/|\?)[^ "]*[^ ,;\.:">)])?)'};
+	$Giraf::Admin::public_functions->{bot_list_urls}={function=>\&bot_list_urls,regex=>'urls.*'};
+	$Giraf::Admin::public_parsers->{bot_add_urls}={function=>\&bot_add_urls,regex=>'((((https?|ftp):\/\/)|www\.)(([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)|localhost|([a-zA-Z0-9\-]+\.)*[a-zA-Z0-9\-]+\.(com|net|org|info|biz|gov|name|edu|[a-zA-Z][a-zA-Z]))(:[0-9]+)?((\/|\?)[^ "]*[^ ,;\.:">)])?)'};
 	$_dbh=DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
 	$_dbh->do("BEGIN TRANSACTION;");
 	$_dbh->do("CREATE TABLE $_tbl_urls (id INTEGER PRIMARY KEY, user TEXT, channel TEXT, date TEXT, url TEXT);");
@@ -26,8 +27,8 @@ sub init {
 }
 
 sub unload {
-	delete($Admin::public_functions->{bot_list_urls});
-	delete($Admin::public_parsers->{bot_add_urls});
+	delete($Giraf::Admin::public_functions->{bot_list_urls});
+	delete($Giraf::Admin::public_parsers->{bot_add_urls});
 }
 
 sub bot_list_urls {

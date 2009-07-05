@@ -6,6 +6,8 @@ package Giraf::Modules::Search;
 use strict;
 use warnings;
 
+use Giraf::Admin;
+
 use LWP::UserAgent;
 
 # Private vars
@@ -14,16 +16,16 @@ our $_ua;
 
 sub init {
 	my ($kernel,$irc) = @_;
-	$Admin::public_functions->{bot_search}={function=>\&bot_search,regex=>'search (.*)'};
-	$Admin::public_functions->{bot_searchn}={function=>\&bot_searchn,regex=>'searchn ([0-9]+) (.*)'};
+	$Giraf::Admin::public_functions->{bot_search}={function=>\&bot_search,regex=>'search (.*)'};
+	$Giraf::Admin::public_functions->{bot_searchn}={function=>\&bot_searchn,regex=>'searchn ([0-9]+) (.*)'};
 	#http://code.google.com/intl/fr/apis/ajaxsearch/documentation/reference.html#_restUrlBase
-	Admin::set_param('Search_GoogleAPIURL','http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large');
-	Admin::set_param('Search_GoogleSafeSearch','off');
+	Giraf::Admin::set_param('Search_GoogleAPIURL','http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large');
+	Giraf::Admin::set_param('Search_GoogleSafeSearch','off');
 	$_ua=LWP::UserAgent->new;
 }
 
 sub unload {
-	delete($Admin::public_functions->{bot_search});
+	delete($Giraf::Admin::public_functions->{bot_search});
 }
 
 sub bot_search {
