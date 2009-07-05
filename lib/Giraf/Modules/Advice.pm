@@ -26,19 +26,19 @@ sub init {
 	$_dbh->do("CREATE TABLE IF NOT EXISTS advices (id INTEGER PRIMARY KEY, typeId INTEGER, advice TEXT UNIQUE, infoId INTEGER REFERENCES infos (id))");
 	$_dbh->do("INSERT OR REPLACE INTO $_tbl_infos (id,name,regex,color) VALUES (1,'Courage Wolf','couragewolf','red')");
 	$_dbh->do("COMMIT;");
-	$_advices->{regex}="advice";
+	my $trigger_regex = "advice";
 	my $sth=$_dbh->prepare("SELECT id,name,regex,color FROM $_tbl_infos");
 	my ($id,$name,$regex,$color);
 	$sth->bind_columns(\$id,\$name,\$regex,\$color);
 	$sth->execute();
 	while($sth->fetch())
 	{
-		$_advices->{regex}=$_advices->{regex}."|".$regex;
+		$trigger_regex = "$trigger_regex|$regex";
 		$_advices->{$id}={name=>$name,regex=>$regex,color=>$color};
 	}
-	$Giraf::Admin::public_functions->{bot_advice}={function=>\&bot_advice,regex=>$_advices->{regex}.'(\s+(\d+))?'};
-	$Giraf::Admin::public_functions->{bot_advice_suggest}={function=>\&bot_advice_suggest,regex=>$_advices->{regex}.'\s+suggest\s+.+'};
-	$Giraf::Admin::public_functions->{bot_advice_validate}={function=>\&bot_advice_validate,regex=>$_advices->{regex}.'\s+validate(\s+(\d+))?'};
+	$Giraf::Admin::public_functions->{bot_advice}={function=>\&bot_advice,regex => $trigger_regex . '(\s+(\d+))?'};
+	$Giraf::Admin::public_functions->{bot_advice_suggest}={function=>\&bot_advice_suggest,regex=>$trigger_regex . '\s+suggest\s+.+'};
+	$Giraf::Admin::public_functions->{bot_advice_validate}={function=>\&bot_advice_validate,regex=>$trigger_regex . '\s+validate(\s+(\d+))?'};
 	$Giraf::Admin::public_functions->{bot_advice_stats}={function=>\&bot_advice_stats,regex=>'advice\s+stats'};
 #	$Giraf::Admin::public_functions->{bot_advice_new}={function=>\&bot_advice_new,regex=>'advice\s(.+)'};
 }
@@ -52,20 +52,21 @@ sub unload {
 }
 
 sub bot_advice_new {
-        my($nick, $dest, $what)=@_;
-        my @return;
+	my($nick, $dest, $what)=@_;
+	my @return;
 #	my $ligne= {action =>"MSG",dest=>$dest,msg=>'[b]'.$titleNoFormatting.'[/b] - [c=teal]'.json_decode($unescapedUrl).'[/c]'};
-	push(@return,$ligne);
+#	push(@return,$ligne);
 	return @return;
 
 }
 
 
 sub bot_advice {
-        my($nick, $dest, $what)=@_;
-        my @return;
-	my $ligne;
+	my($nick, $dest, $what)=@_;
+	my @return;
+	my ($ligne, $count, $sth, $id);
 	my $regex=Giraf::Config::get('triggers').'advice(\s+(\d+))?';
+
 	if($what=~/$regex$/)
 	{
 		my $adid;
@@ -102,7 +103,7 @@ sub bot_advice {
 		foreach $id (sort keys %$_advices) 
 		{
 			$regex=Giraf::Config::get('triggers').$_advices->{$id}->{regex}.'(\s+(\d+))?';
-			if ($id!='regex' and $what=~/$regex$/)
+			if ($what=~/$regex$/)
 			{
 				my $adid;
 				my $rgx=Giraf::Config::get('triggers').$_advices->{$id}->{regex}.'\s+(\d+)';
@@ -145,10 +146,10 @@ sub bot_advice_suggest {
 	my($nick, $dest, $what)=@_;
 	my @return;
 	my $ligne;
-	foreach $id (sort keys %$_advices) 
+	foreach my $id (sort keys %$_advices) 
 	{
-		$regex=Giraf::Config::get('triggers').$_advices->{$id}->{regex}.'\s+suggest\s+(.+)';
-		if ($id!='regex' and $what=~/$regex/)
+		my $regex=Giraf::Config::get('triggers').$_advices->{$id}->{regex}.'\s+suggest\s+(.+)';
+		if ($what=~/$regex/)
 		{
 			my $sth=$_dbh->prepare("INSERT INTO $_tbl_tmp (user,channel,infoId,advice) VALUES (?,?,?,?)");
 			$sth->execute($nick,$dest,$id,$1);
@@ -227,7 +228,7 @@ sub bot_advice_validate {
 
 			if($count==0)
 			{
-				$ligne={ action =>"MSG",dest=>$dest,msg=>"no ".$_advices->{$id}->{name}." to validate for U ! (not found)"};
+				$ligne={ action =>"MSG",dest=>$dest,msg=>"no advice to validate for U ! (not found)"};
 				push(@return,$ligne);
 			}
 
@@ -235,10 +236,10 @@ sub bot_advice_validate {
 	}
 	else
 	{
-		foreach $id (sort keys %$_advices) 
+		foreach my $id (sort keys %$_advices) 
 		{
 			$regex=Giraf::Config::get('triggers').$_advices->{$id}->{regex}.'\s+validate(\s+(\d+))?';
-			if ($id!='regex' and $what=~/$regex$/)
+			if ($what=~/$regex$/)
 			{
 				my $rgx=Giraf::Config::get('triggers').$_advices->{$id}->{regex}.'\s+validate\s+(\d+)';
 				if($what=~/$rgx$/)
@@ -307,7 +308,7 @@ sub bot_advice_stats {
 	my($nick, $dest, $what)=@_;
 	my @return;
 	my ($ligne,$count,$infoId,$output);
-	$i=0;
+	my $i=0;
 	$output="Advice bot stats : ";
 	my $sth=$_dbh->prepare("SELECT COUNT(*),infoId FROM $_tbl_advices GROUP BY (infoId);");
 	$sth->bind_columns(\$count,\$infoId);
