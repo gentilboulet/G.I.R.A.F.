@@ -140,6 +140,7 @@ sub public_msg
 {
 	my ($classe, $nick, $channel, $what )=@_;
 	my @return;
+
 	foreach my $key (keys %$public_functions) 
 	{
 		my $element=$public_functions->{$key};

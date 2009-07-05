@@ -27,14 +27,14 @@ GetOptions(
 	\%opts,       "help",       "server=s",   "serverpass=s",	"botpass=s",
 	"botnick=s",  "botuser=s",  "botrealnam=s",  			"botchan=s",		"botbindip=s",
 	"botident=s", "botmodes=s", "botopcmd=s", "maxtries=i",
-	"botadmin=s", "logfile=s",  "debug=i",	  "triggers=s",
+	"botadmin=s", "logfile=s",  "debug=i",	  "triggers=s", "ssl=i"
   )
   or debug( "Error: Could not parse command line. Try $0 --help", 1 );
 
 $botname = $opts{botnick};
 $triggers=$opts{triggers};
 
-Admin->init_sessions();
+#Admin->init_sessions();
 
 # We create a new PoCo-IRC object and component.
 my $irc = POE::Component::IRC->spawn(
@@ -44,7 +44,7 @@ my $irc = POE::Component::IRC->spawn(
 	ircname  => $opts{botrealname},
 	username => $opts{botuser},
 	localaddr=> $opts{botbindip},
-	debug    => 0,
+	UseSSL => $opts{ssl},
   )
   or die "Oh noooo! $!";
 
