@@ -7,6 +7,7 @@ use strict;
 use warnings;
 
 use Giraf::Admin;
+use Giraf::Config;
 
 sub init {
 	my ($kernel,$irc) = @_;
@@ -21,7 +22,7 @@ sub unload {
 sub bot_roll_dice {
 	my($nick, $dest, $what)=@_;
 	my @return;
-	my $regex= $triggers."dice (.*)";
+	my $regex= Giraf::Config::get('triggers')."dice (.*)";
 	my ($txt) = $what=~/$regex/ ;
 	my $ligne={ action =>"MSG",dest=>$dest,msg=>roll($txt,$nick)};
 	push(@return,$ligne);

@@ -65,11 +65,11 @@ sub bot_advice {
         my($nick, $dest, $what)=@_;
         my @return;
 	my $ligne;
-	my $regex=$triggers.'advice(\s+(\d+))?';
+	my $regex=Giraf::Config::get('triggers').'advice(\s+(\d+))?';
 	if($what=~/$regex$/)
 	{
 		my $adid;
-		my $regex=$triggers.'advice\s+(\d+)';
+		my $regex=Giraf::Config::get('triggers').'advice\s+(\d+)';
 		if($what=~/$regex$/)
 		{
 			$adid=$1;
@@ -101,11 +101,11 @@ sub bot_advice {
 	{
 		foreach $id (sort keys %$_advices) 
 		{
-			$regex=$triggers.$_advices->{$id}->{regex}.'(\s+(\d+))?';
+			$regex=Giraf::Config::get('triggers').$_advices->{$id}->{regex}.'(\s+(\d+))?';
 			if ($id!='regex' and $what=~/$regex$/)
 			{
 				my $adid;
-				my $rgx=$triggers.$_advices->{$id}->{regex}.'\s+(\d+)';
+				my $rgx=Giraf::Config::get('triggers').$_advices->{$id}->{regex}.'\s+(\d+)';
 				if($what=~/$rgx$/)
 				{
 					$adid=$1;
@@ -147,7 +147,7 @@ sub bot_advice_suggest {
 	my $ligne;
 	foreach $id (sort keys %$_advices) 
 	{
-		$regex=$triggers.$_advices->{$id}->{regex}.'\s+suggest\s+(.+)';
+		$regex=Giraf::Config::get('triggers').$_advices->{$id}->{regex}.'\s+suggest\s+(.+)';
 		if ($id!='regex' and $what=~/$regex/)
 		{
 			my $sth=$_dbh->prepare("INSERT INTO $_tbl_tmp (user,channel,infoId,advice) VALUES (?,?,?,?)");
@@ -174,13 +174,13 @@ sub bot_advice_validate {
 	my($nick, $dest, $what)=@_;
 	my @return;
 	my $ligne;
-	my $regex=$triggers.'advice\s+validate(\s+(\d+))?';
+	my $regex=Giraf::Config::get('triggers').'advice\s+validate(\s+(\d+))?';
 #	$_dbh->do("CREATE TABLE IF NOT EXISTS tmp (id INTEGER PRIMARY KEY, user TEXT, channel TEXT, infoId INTEGER REFERENCES infos (id), advice TEXT UNIQUE)");	
 	my ($advice,$infoId,$typeId);
 	if($what=~/$regex$/)
 	{
 		my $adid;
-		my $regex=$triggers.'advice\s+validate\s+(\d+)';
+		my $regex=Giraf::Config::get('triggers').'advice\s+validate\s+(\d+)';
 		if($what=~/$regex$/)
 		{
 			my $tmpid=$1;
@@ -237,10 +237,10 @@ sub bot_advice_validate {
 	{
 		foreach $id (sort keys %$_advices) 
 		{
-			$regex=$triggers.$_advices->{$id}->{regex}.'\s+validate(\s+(\d+))?';
+			$regex=Giraf::Config::get('triggers').$_advices->{$id}->{regex}.'\s+validate(\s+(\d+))?';
 			if ($id!='regex' and $what=~/$regex$/)
 			{
-				my $rgx=$triggers.$_advices->{$id}->{regex}.'\s+validate\s+(\d+)';
+				my $rgx=Giraf::Config::get('triggers').$_advices->{$id}->{regex}.'\s+validate\s+(\d+)';
 				if($what=~/$rgx$/)
 				{
 					my $tmpid=$1;
