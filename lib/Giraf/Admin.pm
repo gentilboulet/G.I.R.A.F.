@@ -40,7 +40,7 @@ sub mod_run {
 	my ($mod, $fn, @args) = @_;
 	my $ret;
 
-	eval ('$ret = ' . "&Giraf::Modules::$mod::$fn" . '(@args);');
+	eval ('$ret = ' . '&Giraf::Modules::' . $mod . '::' . $fn . '(@args);');
 	return $ret;
 }
 
