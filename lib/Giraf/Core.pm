@@ -113,24 +113,25 @@ sub _default
 		irc_names( $_[ARG1] );
 	} else
 	{
-		#debug("unhandled $event");
-
-		my $arg_number = 0;
-		my $str;
-		foreach (@$args)
-		{
-			$str = "  ARG$arg_number = ";
-			if ( ref($_) eq 'ARRAY' )
-			{
-				$str .= "$_ = [", join( ", ", @$_ ), "]";
-			} else
-			{
-				$str .= "'$_'";
-			}
-
-			#debug($str);
-			$arg_number++;
-		}
+## Useless warnings
+#		#debug("unhandled $event");
+#
+#		my $arg_number = 0;
+#		my $str;
+#		foreach (@$args)
+#		{
+#			$str = "  ARG$arg_number = ";
+#			if ( ref($_) eq 'ARRAY' )
+#			{
+#				$str .= "$_ = [", join( ", ", @$_ ), "]";
+#			} else
+#			{
+#				$str .= "'$_'";
+#			}
+#
+#			#debug($str);
+#			$arg_number++;
+#		}
 		return 0;    # Don't handle signals.
 	}
 }
@@ -234,12 +235,22 @@ sub irc_mode
 	my $nick = ( split /!/, $who )[0];
 	if( $what =~/^#.*/ )
 	{
-		debug("chan_mode : $what,$mode_string,$args");
+		if ($args) {
+			debug("chan_mode : $what,$mode_string,$args");
+		}
+		else {
+			debug("chan_mode : $what,$mode_string");
+		}
 		Giraf::Chan->chan_mode($what,$mode_string,$args);
 	}
 	else
 	{
-		debug("user_mode : $what,$mode_string,$args");
+		if ($args) {
+			debug("user_mode : $what,$mode_string,$args");
+		}
+		else {
+			debug("user_mode : $what,$mode_string");
+		}
 		Giraf::Chan->user_mode($what,$mode_string,$args);
 	}
 
