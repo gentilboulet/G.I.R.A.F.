@@ -5,6 +5,7 @@ package Giraf::Modules::Chan;
 
 use strict;
 use warnings;
+
 use DBI;
 
 our $dbh;

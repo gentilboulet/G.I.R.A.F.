@@ -3,18 +3,25 @@ $|=1 ;
 
 package Giraf::Modules::Urls;
 
+use strict;
+use warnings;
+
+use Giraf::Config;
+
 use DBI;
 use List::Util qw[min max];
 
 our $dbh;
 
+my $tbl_urls = 'mod_urls_urls';
+
 sub init {
 	my ($kernel,$irc) = @_;
 	$Admin::public_functions->{bot_list_urls}={function=>\&bot_list_urls,regex=>'urls.*'};
 	$Admin::public_parsers->{bot_add_urls}={function=>\&bot_add_urls,regex=>'((((https?|ftp):\/\/)|www\.)(([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)|localhost|([a-zA-Z0-9\-]+\.)*[a-zA-Z0-9\-]+\.(com|net|org|info|biz|gov|name|edu|[a-zA-Z][a-zA-Z]))(:[0-9]+)?((\/|\?)[^ "]*[^ ,;\.:">)])?)'};
-	$dbh=DBI->connect("dbi:SQLite:dbname=Modules/DB/urls.db","","");
+	$dbh=DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
 	$dbh->do("BEGIN TRANSACTION;");
-	$dbh->do("CREATE TABLE urls (id INTEGER PRIMARY KEY, user TEXT, channel TEXT, date TEXT, url TEXT);");
+	$dbh->do("CREATE TABLE $tbl_urls (id INTEGER PRIMARY KEY, user TEXT, channel TEXT, date TEXT, url TEXT);");
 	$dbh->do("COMMIT;");
 }
 
@@ -26,12 +33,12 @@ sub unload {
 sub bot_list_urls {
 	my($nick, $dest, $what)=@_;
 	my @return;
-	my $sth=$dbh->prepare("SELECT user,channel,date,url FROM urls WHERE channel LIKE ? ORDER BY -id LIMIT 0,?");
+	my $sth=$dbh->prepare("SELECT user,channel,date,url FROM $tbl_urls WHERE channel LIKE ? ORDER BY -id LIMIT 0,?");
 	my ($usr,$channel,$date,$url);
 	$sth->bind_columns( \$usr, \$channel , \$date, \$url );
 	if( my ($search) = $what =~/urls search (.*)/ )
 	{
-		my $sth2=$dbh->prepare("SELECT user,channel,date,url FROM urls WHERE urls LIKE ? OR  user LIKE ? LIMIT 0,10");
+		my $sth2=$dbh->prepare("SELECT user,channel,date,url FROM $tbl_urls WHERE urls LIKE ? OR  user LIKE ? LIMIT 0,10");
 		$sth2->bind_columns( \$usr, \$channel , \$date, \$url );
 		$sth2->execute($search,$search);
 		while($sth->fetch())
@@ -42,7 +49,7 @@ sub bot_list_urls {
 
 	}elsif( my ($search,$num) = $what =~/urls search (.*) (\d*)/ )
 	{
-		my $sth2=$dbh->prepare("SELECT user,channel,date,url FROM urls WHERE urls LIKE %?% OR  user LIKE %?% LIMIT 0,?");
+		my $sth2=$dbh->prepare("SELECT user,channel,date,url FROM $tbl_urls WHERE urls LIKE %?% OR  user LIKE %?% LIMIT 0,?");
 		$sth2->bind_columns( \$usr, \$channel , \$date, \$url );
 		$sth2->execute($search,$search,$num);
 		while($sth->fetch())
@@ -97,7 +104,7 @@ sub bot_add_urls {
 	my($nick, $dest, $what)=@_;
 	my $regex=$Admin::public_parsers->{bot_add_urls}->{regex};
 	my ($url) = $what=~/$regex/ ;
-	my $sth=$dbh->prepare("INSERT INTO urls (url,user,channel,date) VALUES (?,?,?,datetime('now','localtime'));");
+	my $sth=$dbh->prepare("INSERT INTO $tbl_urls (url,user,channel,date) VALUES (?,?,?,datetime('now','localtime'));");
 	$sth->execute($url,$nick,$dest);
 	my @return;
 	return @return;

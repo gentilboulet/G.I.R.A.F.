@@ -2,6 +2,9 @@
 $|=1 ;
 package Giraf::Modules::Dice;
 
+use strict;
+use warnings;
+
 use Giraf::Modules::Admin;
 
 sub init {

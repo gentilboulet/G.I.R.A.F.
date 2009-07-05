@@ -5,6 +5,9 @@ package Giraf::Modules::Admin;
 
 use strict;
 use warnings;
+
+use Giraf::Config;
+
 use DBI;
 
 our $kernel;
@@ -20,11 +23,13 @@ our $public_parsers;
 our $private_parsers;
 our $dbh;
 
+my $tbl_modules = 'modules';
+my $tbl_users = 'users';
+my $tbl_config = 'config';
 
 sub init_sessions {
-
-	$dbh=DBI->connect("dbi:SQLite:dbname=Modules/DB/modules.db","","");
-	my $sth=$dbh->prepare("SELECT file,name FROM modules WHERE session>0");
+	$dbh = DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
+	my $sth=$dbh->prepare("SELECT file,name FROM $tbl_modules WHERE session>0");
         my ($module, $module_name);
         $sth->bind_columns( \$module, \$module_name );
         $sth->execute();
@@ -51,13 +56,13 @@ sub init {
 	$public_functions->{bot_quit}={function=>\&bot_quit,regex=>'quit(.*)'};
 	$public_functions->{bot_reload_modules}={function=>\&bot_reload_modules,regex=>'module reload'};
 
-        $dbh=DBI->connect("dbi:SQLite:dbname=Modules/DB/modules.db","","");
-	$dbh->do("CREATE TABLE IF NOT EXISTS modules (autorun NUMERIC, file TEXT, name TEXT,session NUMERIC, loaded NUMERIC);");
-	$dbh->do("CREATE TABLE IF NOT EXISTS users (name TEXT PRIMARY KEY, privileges NUMERIC);");
-	$dbh->do("CREATE TABLE IF NOT EXISTS config (name TEXT PRIMARY KEY, value TEXT);");
-	$dbh->do("INSERT INTO users(name,privileges) VALUES('GentilBoulet',0);");
+	$dbh = DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
+	$dbh->do("CREATE TABLE IF NOT EXISTS $tbl_modules (autorun NUMERIC, file TEXT, name TEXT,session NUMERIC, loaded NUMERIC);");
+	$dbh->do("CREATE TABLE IF NOT EXISTS $tbl_users (name TEXT PRIMARY KEY, privileges NUMERIC);");
+	$dbh->do("CREATE TABLE IF NOT EXISTS $tbl_config (name TEXT PRIMARY KEY, value TEXT);");
+	$dbh->do("INSERT INTO $tbl_users(name,privileges) VALUES('GentilBoulet',0);");
 
-	my $sth=$dbh->prepare("SELECT file,name FROM modules WHERE autorun>0");
+	my $sth=$dbh->prepare("SELECT file,name FROM $tbl_modules WHERE autorun>0");
 	my ($module, $module_name);
 	$sth->bind_columns( \$module, \$module_name );
 	$sth->execute();
@@ -66,7 +71,7 @@ sub init {
 		eval "require Giraf::Modules::$module_name;";
 		eval "&Giraf::Modules::$module_name" . '::init($Admin::kernel,$Admin::irc_session);';
 	}
-	$dbh->do("UPDATE modules SET loaded=1 WHERE autorun>0");
+	$dbh->do("UPDATE $tbl_modules SET loaded=1 WHERE autorun>0");
 	$kernel->yield("connect");
 }
 
@@ -121,17 +126,17 @@ sub on_bot_quit {
 	my ($classe,$reason)=@_;
 	my ($count,$module,$module_name,$sth);
         Giraf::Core::set_quit();
-	$sth=$dbh->prepare("SELECT COUNT(*),file,name FROM modules WHERE loaded=1");
+	$sth=$dbh->prepare("SELECT COUNT(*),file,name FROM $tbl_modules WHERE loaded=1");
 
 	$sth->bind_columns( \$count, \$module , \$module_name);
 	$sth->execute();
 	while($sth->fetch())
 	{
-		require($module);
-		$sth=$dbh->prepare("UPDATE modules SET loaded=0 WHERE name LIKE ?");
+		eval "require Giraf::Modules::$module_name;";
+		$sth=$dbh->prepare("UPDATE $tbl_modules SET loaded=0 WHERE name LIKE ?");
 		$sth->execute($module_name);
-		eval "&".$module_name.'::unload();';
-                eval "&".$module_name.'::quit();'
+		eval "&Giraf::Modules::$module_name" . '::unload);';
+		eval "&Giraf::Modules::$module_name" . '::quit);';
 	}
 	$kernel->signal( $kernel, 'POCOIRC_SHUTDOWN', $reason );
 	return 0;
@@ -194,7 +199,7 @@ sub private_msg
 sub set_param
 {
 	my ($param,$value)=@_;
-	my $sth=$dbh->prepare("INSERT OR REPLACE INTO config(name,value) VALUES(?,?)");
+	my $sth=$dbh->prepare("INSERT OR REPLACE INTO $tbl_config(name,value) VALUES(?,?)");
 	$sth->execute($param,$value);
 	return $param;
 }
@@ -203,7 +208,7 @@ sub get_param
 {
 	my ($what)=@_;
 	my $value;
-	my $sth=$dbh->prepare("SELECT value FROM config WHERE name LIKE ?");
+	my $sth=$dbh->prepare("SELECT value FROM $tbl_config WHERE name LIKE ?");
 	$sth->bind_columns(\$value);
 	$sth->execute($what);
 	$sth->fetch();
@@ -241,7 +246,7 @@ sub bot_load_module {
 	my($nick, $dest, $what)=@_;
 	my @return;
 	my $regex= $triggers."module load (.+)";
-	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges >= 10000");
+	my $sth=$dbh->prepare("SELECT COUNT(*) FROM $tbl_users WHERE name LIKE ? AND privileges >= 10000");
 	my $count;
 	$sth->bind_columns( \$count);
 	$sth->execute($nick);
@@ -249,7 +254,7 @@ sub bot_load_module {
 	if($count > 0)
 	{
 
-		$sth=$dbh->prepare("SELECT COUNT(*),file,name FROM modules WHERE name LIKE ?");
+		$sth=$dbh->prepare("SELECT COUNT(*),file,name FROM $tbl_modules WHERE name LIKE ?");
 		my ($module,$module_name);
 		$sth->bind_columns( \$count, \$module , \$module_name);
 		if( my ($txt) = $what=~/$regex/ )
@@ -259,7 +264,7 @@ sub bot_load_module {
 			if($count > 0)
 			{
 				eval "require Giraf::Modules::$module_name;";
-				$sth=$dbh->prepare("UPDATE modules SET loaded=1 WHERE name LIKE ?");
+				$sth=$dbh->prepare("UPDATE $tbl_modules SET loaded=1 WHERE name LIKE ?");
 				$sth->execute($txt);
 				eval "&Giraf::Modules::$module_name" . '::init($Admin::kernel,$Admin::irc_session);';
 				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] chargé !'};
@@ -280,14 +285,14 @@ sub bot_unload_module {
 	my($nick, $dest, $what)=@_;
 	my @return;
 	my $regex= $triggers."module unload (.+)";
-	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges >= 10000");
+	my $sth=$dbh->prepare("SELECT COUNT(*) FROM $tbl_users WHERE name LIKE ? AND privileges >= 10000");
 	my $count;
 	$sth->bind_columns( \$count);
 	$sth->execute($nick);
 	$sth->fetch();
 	if($count > 0)
 	{
-		$sth=$dbh->prepare("SELECT COUNT(*),file,name FROM modules WHERE name LIKE ?");
+		$sth=$dbh->prepare("SELECT COUNT(*),file,name FROM $tbl_modules WHERE name LIKE ?");
 		my ($module,$module_name);
 		$sth->bind_columns( \$count, \$module , \$module_name);
 		if( my ($txt) = $what=~/$regex/ )
@@ -296,7 +301,7 @@ sub bot_unload_module {
 			$sth->fetch();
 			if($count > 0)
 			{
-				$sth=$dbh->prepare("UPDATE modules SET loaded=0 WHERE name LIKE ?");
+				$sth=$dbh->prepare("UPDATE $tbl_modules SET loaded=0 WHERE name LIKE ?");
 				$sth->execute($txt);
 				eval "&Giraf::Modules::$module_name" . '::unload();';
 				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] déchargé !'};
@@ -315,7 +320,7 @@ sub bot_unload_module {
 
 sub bot_add_module {
 	my($nick, $dest, $what)=@_;
-	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges >= 10000");
+	my $sth=$dbh->prepare("SELECT COUNT(*) FROM $tbl_users WHERE name LIKE ? AND privileges >= 10000");
 	my $regex= $triggers."module add (.+) (.+\.pm) ([0-9]*)";
 	my $count;
 	my @return;
@@ -324,7 +329,7 @@ sub bot_add_module {
 	$sth->fetch();
 	if($count > 0)
 	{
-		$sth=$dbh->prepare("INSERT INTO modules (name,file,autorun) VALUES (?,?,?)");
+		$sth=$dbh->prepare("INSERT INTO $tbl_modules (name,file,autorun) VALUES (?,?,?)");
 		if( my ($name,$file,$autorun) = $what=~/$regex/ )
 		{
 			if( -e "lib/Giraf/Modules/".$file )
@@ -352,7 +357,7 @@ sub bot_add_module {
 
 sub bot_del_module {
 	my($nick, $dest, $what)=@_;
-	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges >= 10000");
+	my $sth=$dbh->prepare("SELECT COUNT(*) FROM $tbl_users WHERE name LIKE ? AND privileges >= 10000");
 	my $regex= $triggers."module del (.+)";
 	my $count;
 	my @return;
@@ -371,7 +376,7 @@ sub bot_del_module {
 		}
 	 	else 
 		{
-			$sth=$dbh->prepare("DELETE FROM modules WHERE name=?");
+			$sth=$dbh->prepare("DELETE FROM $tbl_modules WHERE name=?");
 			$sth->execute($name);
 			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] retiré !'};
 			push(@return,$ligne);
@@ -383,7 +388,7 @@ sub bot_del_module {
 
 sub bot_list_module {
 	my($nick, $dest, $what)=@_;
-	my $sth=$dbh->prepare("SELECT name,autorun,session,loaded FROM modules");
+	my $sth=$dbh->prepare("SELECT name,autorun,session,loaded FROM $tbl_modules");
 	my $regex= $triggers."module list";
 	my @return;
 	my $name; 
@@ -404,7 +409,7 @@ sub bot_list_module {
 
 sub bot_quit {
 	my($nick, $dest, $what)=@_;
-	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges >= 10000");
+	my $sth=$dbh->prepare("SELECT COUNT(*) FROM $tbl_users WHERE name LIKE ? AND privileges >= 10000");
 	my $count;
 	my @return;
 	$sth->bind_columns( \$count);

@@ -2,6 +2,10 @@
 $|=1;
 
 package Giraf::Modules::CallVote;
+
+use strict;
+use warnings;
+
 use List::Util qw[min max];
 use POE;
 

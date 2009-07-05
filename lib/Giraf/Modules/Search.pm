@@ -3,7 +3,9 @@ $|=1 ;
 
 package Giraf::Modules::Search;
 
-use DBI;
+use strict;
+use warnings;
+
 use LWP::UserAgent;
 
 our $dbh;

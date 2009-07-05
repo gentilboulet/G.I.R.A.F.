@@ -1,10 +1,14 @@
 #! /usr/bin/perl -w
 package Giraf::Core;
 
+use strict;
+use warnings;
+
+use Giraf::Config;
 use Giraf::Modules::Chan;
 use Giraf::Modules::Admin;
+
 use POSIX;
-use strict;
 use POE qw(Component::IRC);
 use Getopt::Long;
 use Data::Dumper;
@@ -15,18 +19,19 @@ our $botname;                   #botname
 our $triggers;
 our $kernel;
 our $quit=0;
-our %config;
 our $irc;
 
 sub init {
-	my (%opts) = @_;
+	my ($cfg_file) = @_;
 
-	%config = %opts;
+	Giraf::Config::load($cfg_file) or return 0;
 
-	$botname = $config{botnick};
-	$triggers = $config{triggers};
+	$botname = Giraf::Config::get('botnick');
+	$triggers = Giraf::Config::get('triggers');
 
 	#Giraf::Modules::Admin->init_sessions();
+
+	return 1;
 }
 
 sub run {
@@ -34,12 +39,12 @@ sub run {
 	# We create a new PoCo-IRC object and component.
 	$irc = POE::Component::IRC->spawn(
 		nick     => $botname,
-		server   => $config{server},
-		port     => $config{port},
-		ircname  => $config{botrealname},
-		username => $config{botuser},
-		localaddr=> $config{botbindip},
-		UseSSL => $config{ssl},
+		server   => Giraf::Config::get('server'),
+		port     => Giraf::Config::get('port'),
+		ircname  => Giraf::Config::get('botrealname'),
+		username => Giraf::Config::get('botuser'),
+		localaddr=> Giraf::Config::get('botbindip'),
+		UseSSL => Giraf::Config::get('ssl'),
 	  )
 	  or die "Oh noooo! $!";
 	
@@ -82,7 +87,7 @@ sub irc_001
 	debug( "Connected to " . $poco_object->server_name() );
 
 	# In any irc_* events SENDER will be the PoCo-IRC session
-	foreach my $nom ( @{ $config{botchan} } )
+	foreach my $nom ( @{ Giraf::Config::get('botchan') } )
 	{
 		Giraf::Modules::Chan->join($nom);
 	}
@@ -91,7 +96,7 @@ sub irc_001
 
 sub irc_433
 {
-	my ($kernel) = @_[KERNEL];
+	my ($kernel) = $_[KERNEL];
 	$botname = "Mr_Bobby";
 	$kernel->post( $irc => nick => $botname );
 	Giraf::Modules::Chan->init( $kernel, $irc, $botname );
@@ -105,7 +110,7 @@ sub _default
 
 	if ( $event =~ /^irc_(353)$/ )
 	{
-		irc_names( @_[ARG1] );
+		irc_names( $_[ARG1] );
 	} else
 	{
 		#debug("unhandled $event");
@@ -134,7 +139,7 @@ sub irc_disconnected
 {
 	if(!$quit)
 	{
-		debug( "Lost connection to server " . $config{server} . "." );
+		debug( "Lost connection to server " . Giraf::Config::get('server') . "." );
 		irc_reconnect( $_[KERNEL] );
 	}
 }
@@ -280,7 +285,7 @@ sub _start
 	undef;
 	Giraf::Modules::Chan->init( $kernel,  $irc ,$botname);
 	Giraf::Modules::Admin->init( $kernel, $irc ,$triggers);
-	$kernel->post ($irc_session =>  'privmsg' => nickserv => "IDENTIFY ".$config{botpass});
+	$kernel->post ($irc_session =>  'privmsg' => nickserv => "IDENTIFY ".Giraf::Config::get('botpass'));
 	$kernel->sig( INT => "sigint" );
 }
 
@@ -362,7 +367,7 @@ sub bbcode
 sub debug
 {
 	my ($text) = @_;
-	_log($text,$config{debug});
+	_log($text,Giraf::Config::get('debug'));
 	return $text;
 }
 
@@ -373,9 +378,9 @@ sub _log
 	{
 		print ts() . "$text\n";
 	}
-	if ($config{logfile} )
+	if (Giraf::Config::get('logfile') )
 	{
-		open (LOGF, '>>'.$config{logfile});
+		open (LOGF, '>>' . Giraf::Config::get('logfile'));
 		print LOGF ts() . "$text\n";
 		close LOGF;
 	}

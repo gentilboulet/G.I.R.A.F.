@@ -3,10 +3,17 @@ $|=1 ;
 
 package Giraf::Modules::Karma;
 
+use strict;
+use warnings;
+
+use Giraf::Config;
+
 use DBI;
 use List::Util qw[min max];
 
 our $dbh;
+
+my $tbl_karm = 'mod_karma_karma';
 
 sub init {
 	my ($kernel,$irc) = @_;
@@ -14,9 +21,9 @@ sub init {
 	$Admin::public_parsers->{bot_karma_plusplus}={function=>\&bot_karma_pp,regex=>'(\w+)\+\+'};
 	$Admin::public_parsers->{bot_karma_moinsmoins}={function=>\&bot_karma_mm,regex=>'(\w+)--'};
 
-	$dbh=DBI->connect("dbi:SQLite:dbname=Modules/DB/karma.db","","");
+	$dbh=DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
 	$dbh->do("BEGIN TRANSACTION;");
-	$dbh->do("CREATE TABLE karma (karma INTEGER , keyword TEXT UNIQUE);");
+	$dbh->do("CREATE TABLE $tbl_karma (karma INTEGER , keyword TEXT UNIQUE);");
 	$dbh->do("COMMIT;");
 }
 
@@ -31,7 +38,7 @@ sub bot_get_karma
 	my($nick, $dest, $what)=@_;
 	my @return;
 	my $karma;
-	my $sth=$dbh->prepare("SELECT karma FROM karma WHERE keyword LIKE ?");
+	my $sth=$dbh->prepare("SELECT karma FROM $tbl_$tbl_karma WHERE keyword LIKE ?");
 	$sth->bind_columns( \$karma );
 	if( my ($kw) = $what =~/karma show (\w+).*/)
 	{
@@ -96,12 +103,12 @@ sub bot_get_karma
 
 sub bot_karma_pp {
 	my($nick, $dest, $what)=@_;
-	my $sth=$dbh->prepare("INSERT INTO karma (keyword,karma) VALUES (?,0);");
+	my $sth=$dbh->prepare("INSERT INTO $tbl_karma (keyword,karma) VALUES (?,0);");
 	my ($kw) = $what =~/(\w+)\+\+/ ;
 	if($nick ne $kw)
 	{
 		$sth->execute($kw);
-		$sth=$dbh->prepare("UPDATE karma SET karma=karma+1 WHERE keyword LIKE ?");
+		$sth=$dbh->prepare("UPDATE $tbl_karma SET karma=karma+1 WHERE keyword LIKE ?");
 		$sth->execute($kw);
 	}
 	return @return;
@@ -109,12 +116,12 @@ sub bot_karma_pp {
 
 sub bot_karma_mm {
 	my($nick, $dest, $what)=@_;
-	my $sth=$dbh->prepare("INSERT INTO karma (keyword,karma) VALUES (?,0);");
+	my $sth=$dbh->prepare("INSERT INTO $tbl_karma (keyword,karma) VALUES (?,0);");
 	my ($kw) = $what =~/(\w+)--/ ;
 	if($nick ne $kw)
 	{
 		$sth->execute($kw);
-		$sth=$dbh->prepare("UPDATE karma SET karma=karma-1 WHERE keyword LIKE ?");
+		$sth=$dbh->prepare("UPDATE $tbl_karma SET karma=karma-1 WHERE keyword LIKE ?");
 		$sth->execute($kw);
 	}
 	return @return;
