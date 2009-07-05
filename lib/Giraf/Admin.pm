@@ -29,6 +29,21 @@ our $_tbl_modules = 'modules';
 our $_tbl_users = 'users';
 our $_tbl_config = 'config';
 
+sub mod_load {
+	my ($mod) = @_;
+	
+	eval ("require Giraf::Modules::$mod;");
+	return $@;
+}
+
+sub mod_run {
+	my ($mod, $fn, @args) = @_;
+	my $ret;
+
+	eval ('$ret = ' . "&Giraf::Modules::$mod::$fn" . '(@args);');
+	return $ret;
+}
+
 sub init_sessions {
 	$_dbh = DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
 	my $sth=$_dbh->prepare("SELECT file,name FROM $_tbl_modules WHERE session>0");
@@ -64,16 +79,26 @@ sub init {
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_config (name TEXT PRIMARY KEY, value TEXT);");
 	$_dbh->do("INSERT INTO $_tbl_users(name,privileges) VALUES('GentilBoulet',0);");
 
+	# Mark all modules as not loaded
+	$_dbh->do("UPDATE $_tbl_modules SET loaded=0");
+
 	my $sth=$_dbh->prepare("SELECT file,name FROM $_tbl_modules WHERE autorun>0");
 	my ($module, $module_name);
 	$sth->bind_columns( \$module, \$module_name );
 	$sth->execute();
 	while($sth->fetch() )
 	{
-		eval "require Giraf::Modules::$module_name;";
-		eval "&Giraf::Modules::$module_name" . '::init($ker, $irc_session);';
+		my $err = mod_load($module_name);
+		if ($err) {
+			print "Error while loading module \"$module_name\" ! Reason: $err\n";
+		}
+		else {
+			mod_run($module_name, 'init', $ker, $irc_session);
+			# Mark module as loaded
+			my $req = $_dbh->prepare("UPDATE $_tbl_modules SET loaded=1 WHERE name = ?");
+			$req->execute($module_name);
+		}
 	}
-	$_dbh->do("UPDATE $_tbl_modules SET loaded=1 WHERE autorun>0");
 	$_kernel->yield("connect");
 }
 
@@ -134,11 +159,11 @@ sub on_bot_quit {
 	$sth->execute();
 	while($sth->fetch())
 	{
-		eval "require Giraf::Modules::$module_name;";
+		my $err = mod_load($module_name);	# XXX: why ??
 		$sth=$_dbh->prepare("UPDATE $_tbl_modules SET loaded=0 WHERE name LIKE ?");
 		$sth->execute($module_name);
-		eval "&Giraf::Modules::$module_name" . '::unload);';
-		eval "&Giraf::Modules::$module_name" . '::quit);';
+		mod_run($module_name, 'unload');
+		mod_run($module_name, 'quit');
 	}
 	$_kernel->signal( $_kernel, 'POCOIRC_SHUTDOWN', $reason );
 	return 0;
@@ -265,11 +290,18 @@ sub bot_load_module {
 			$sth->fetch();
 			if($count > 0)
 			{
-				eval "require Giraf::Modules::$module_name;";
-				$sth=$_dbh->prepare("UPDATE $_tbl_modules SET loaded=1 WHERE name LIKE ?");
-				$sth->execute($txt);
-				eval "&Giraf::Modules::$module_name" . '::init($_kernel,$_irc_session);';
-				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] chargé !'};
+				my $ligne;
+				my $err = mod_load($module_name);
+				if ($err) {
+					print "Error while loading module \"$module_name\" ! Reason: $err\n";
+					$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] borken ! (non chargé)'};
+				}
+				else {
+					mod_run($module_name, 'init', $_kernel, $_irc); # TODO: check return
+					$sth=$_dbh->prepare("UPDATE $_tbl_modules SET loaded=1 WHERE name LIKE ?");
+					$sth->execute($txt);
+					$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] chargé !'};
+				}
 				push(@return,$ligne);
 			}
 			else
@@ -303,9 +335,9 @@ sub bot_unload_module {
 			$sth->fetch();
 			if($count > 0)
 			{
+				mod_run($module_name, 'unload'); # TODO: check return
 				$sth=$_dbh->prepare("UPDATE $_tbl_modules SET loaded=0 WHERE name LIKE ?");
 				$sth->execute($txt);
-				eval "&Giraf::Modules::$module_name" . '::unload();';
 				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] déchargé !'};
 				push(@return,$ligne);
 			}
