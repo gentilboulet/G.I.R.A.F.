@@ -1,5 +1,6 @@
 #! /usr/bin/perl
-$|=1 ;
+$|=1;
+
 package Giraf::Modules::Dice;
 
 use strict;
@@ -9,12 +10,10 @@ use Giraf::Admin;
 
 sub init {
 	my ($kernel,$irc) = @_;
-
 	$Giraf::Admin::public_functions->{bot_roll_dice}={function=>\&bot_roll_dice,regex=>'dice (.*)'};
 }
 
 sub unload {
-	my ($kernel,$irc) = @_;
 	delete($Giraf::Admin::public_functions->{bot_roll_dice});
 }
 

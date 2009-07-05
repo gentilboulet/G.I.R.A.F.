@@ -1,4 +1,4 @@
-#/usr/bin/perl
+#! /usr/bin/perl
 $|=1;
 
 package Giraf::Modules::Weee;
