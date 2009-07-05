@@ -1,6 +1,8 @@
 #! /usr/bin/perl
 $|=1 ;
-package Quotes;
+
+package Giraf::Modules::Quotes;
+
 use DBI;
 
 our $dbh;

@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 $|=1 ;
-package Advice;
+package Giraf::Modules::Advice;
 use DBI;
 
 our $dbh;

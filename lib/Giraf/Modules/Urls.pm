@@ -1,6 +1,8 @@
 #! /usr/bin/perl
 $|=1 ;
-package Urls;
+
+package Giraf::Modules::Urls;
+
 use DBI;
 use List::Util qw[min max];
 

@@ -1,6 +1,8 @@
 #! /usr/bin/perl
 $|=1 ;
-package Karma;
+
+package Giraf::Modules::Karma;
+
 use DBI;
 use List::Util qw[min max];
 

@@ -1,9 +1,10 @@
 #! /usr/bin/perl
 $| = 1;
 
-package Admin;
-use Chan;
-use Reload;
+package Giraf::Modules::Admin;
+
+use strict;
+use warnings;
 use DBI;
 
 our $kernel;
@@ -62,8 +63,8 @@ sub init {
 	$sth->execute();
 	while($sth->fetch() )
 	{
-		require($module);
-		eval "&".$module_name.'::init($Admin::kernel,$Admin::irc_session);';
+		eval "require Giraf::Modules::$module_name;";
+		eval "&Giraf::Modules::$module_name" . '::init($Admin::kernel,$Admin::irc_session);';
 	}
 	$dbh->do("UPDATE modules SET loaded=1 WHERE autorun>0");
 	$kernel->yield("connect");
@@ -118,9 +119,10 @@ sub on_join {
 
 sub on_bot_quit {
 	my ($classe,$reason)=@_;
-        Giraf::set_quit();
+	my ($count,$module,$module_name,$sth);
+        Giraf::Core::set_quit();
 	$sth=$dbh->prepare("SELECT COUNT(*),file,name FROM modules WHERE loaded=1");
-	my ($count,$module,$module_name);
+
 	$sth->bind_columns( \$count, \$module , \$module_name);
 	$sth->execute();
 	while($sth->fetch())
@@ -182,7 +184,7 @@ sub private_msg
 		my $regex=$element->{regex};
 		if ($what =~/$regex/)
 		{
-			push(@return,$element->{function}->($nick,$channel,$what));
+			push(@return,$element->{function}->($nick,$where,$what));
 		}
 	}
 	return @return;
@@ -232,8 +234,6 @@ sub bot_do {
 sub bot_reload_modules
 {
 	Giraf::debug('AACallVote start !!');
-	$Giraf::Reload::Debug=3;
-	Reload->check();
 	Giraf::debug('BBCallVote start !!');
 }
 
@@ -258,10 +258,10 @@ sub bot_load_module {
 			$sth->fetch();
 			if($count > 0)
 			{
-				require($module);
+				eval "require Giraf::Modules::$module_name;";
 				$sth=$dbh->prepare("UPDATE modules SET loaded=1 WHERE name LIKE ?");
 				$sth->execute($txt);
-				eval "&".$module_name.'::init($Admin::kernel,$Admin::irc_session);';
+				eval "&Giraf::Modules::$module_name" . '::init($Admin::kernel,$Admin::irc_session);';
 				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] chargé !'};
 				push(@return,$ligne);
 			}
@@ -296,10 +296,9 @@ sub bot_unload_module {
 			$sth->fetch();
 			if($count > 0)
 			{
-				require($module);
 				$sth=$dbh->prepare("UPDATE modules SET loaded=0 WHERE name LIKE ?");
 				$sth->execute($txt);
-				eval "&".$module_name.'::unload();';
+				eval "&Giraf::Modules::$module_name" . '::unload();';
 				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] déchargé !'};
 				push(@return,$ligne);
 			}
@@ -328,7 +327,7 @@ sub bot_add_module {
 		$sth=$dbh->prepare("INSERT INTO modules (name,file,autorun) VALUES (?,?,?)");
 		if( my ($name,$file,$autorun) = $what=~/$regex/ )
 		{
-			if( -e "./Modules/".$file )
+			if( -e "lib/Giraf/Modules/".$file )
 			{
 
 				$sth->execute($name,$file,$autorun);
@@ -354,27 +353,29 @@ sub bot_add_module {
 sub bot_del_module {
 	my($nick, $dest, $what)=@_;
 	my $sth=$dbh->prepare("SELECT COUNT(*) FROM users WHERE name LIKE ? AND privileges >= 10000");
-	my $regex= $triggers."module de (.+))";
+	my $regex= $triggers."module del (.+)";
 	my $count;
 	my @return;
+
 	$sth->bind_columns( \$count);
 	$sth->execute($nick);
 	$sth->fetch();
+
 	if($count > 0)
 	{
-		$sth=$dbh->prepare("DELETE FROM modules WHERE name='?'");
-		if( my ($name) = $what=~/$regex/ )
+		my ($name) = $what=~/$regex/;
+		if (!$name)
 		{
+			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'."$name".'[/c] non retiré ! Ligne indechiffrable !'};
+			push(@return,$ligne);
+		}
+	 	else 
+		{
+			$sth=$dbh->prepare("DELETE FROM modules WHERE name=?");
 			$sth->execute($name);
 			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] retiré !'};
 			push(@return,$ligne);
 		}
-		else
-		{
-			$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'."$name $file $autorun".'[/c] non retiré ! Ligne indechiffrable !'};
-			push(@return,$ligne);
-		}
-
 	}
 	return @return
 
@@ -393,7 +394,7 @@ sub bot_list_module {
 	$sth->execute();
 	while($sth->fetch())
 	{
-		my $ligne= {action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] : autorun=[color=orange]'.$autorun.'[/color];session=[c=teal]'.$session.'[/c];loaded=[c=teal]'.$loaded.'[/c]'};
+		my $ligne= {action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] : autorun=[color=orange]'.$autorun.'[/color];loaded=[c=teal]'.$loaded.'[/c]'};
 		push(@return,$ligne);
 	}
 	return @return
@@ -417,7 +418,7 @@ sub bot_quit {
 		{
 			$reason=$1;
 		}
-		Admin::on_bot_quit($reason);
+		Giraf::Modules::Admin::on_bot_quit($reason);
 	}
 	return @return
 }

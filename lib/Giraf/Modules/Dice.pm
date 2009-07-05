@@ -1,7 +1,8 @@
 #! /usr/bin/perl
 $|=1 ;
-package Dice;
-use Admin;
+package Giraf::Modules::Dice;
+
+use Giraf::Modules::Admin;
 
 sub init {
 	my ($kernel,$irc) = @_;

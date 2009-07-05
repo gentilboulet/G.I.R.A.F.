@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 $|=1;
 
-package CallVote;
+package Giraf::Modules::CallVote;
 use List::Util qw[min max];
 use POE;
 

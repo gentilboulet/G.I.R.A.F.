@@ -1,7 +1,10 @@
 #! /usr/bin/perl
 $| = 1;
 
-package Chan;
+package Giraf::Modules::Chan;
+
+use strict;
+use warnings;
 use DBI;
 
 our $dbh;
@@ -103,24 +106,25 @@ sub add_user {
 
 sub quit_user {
 	my ( $classe, $user ) = @_;
-	$sth=$dbh->prepare('DELETE FROM presences WHERE user_id = (SELECT id FROM users WHERE name LIKE ?);');
+	my $sth=$dbh->prepare('DELETE FROM presences WHERE user_id = (SELECT id FROM users WHERE name LIKE ?);');
 	$sth->execute($user);
 }
 
 sub part_user {
 	my ( $class, $chan, $user ) = @_;
-	$sth=$dbh->prepare('DELETE FROM presences WHERE user_id = (SELECT id FROM users WHERE name LIKE ?) AND chan_id=(SELECT id FROM chans WHERE name LIKE ?);');
+	my $sth=$dbh->prepare('DELETE FROM presences WHERE user_id = (SELECT id FROM users WHERE name LIKE ?) AND chan_id=(SELECT id FROM chans WHERE name LIKE ?);');
 	$sth->execute($user,$chan);
 }
 
 sub nick_user {
 	my ( $classe, $old_user, $new_user ) = @_;
-	$sth=$dbh->prepare('UPDATE users SET name=? WHERE name=?');
+	my $sth=$dbh->prepare('UPDATE users SET name=? WHERE name=?');
 	$sth->execute($new_user,$old_user);
 }
 
 sub chan_mode {
 	my ($classe, $chan, $str, $args) = @_;
+	my $sth;
 	if($str=~/^\+([vbo])$/)
 	{
 		$sth=$dbh->prepare('UPDATE presences SET privilege_type=? WHERE user_id=(SELECT id FROM users WHERE name LIKE ?) AND chan_id=(SELECT id FROM chans WHERE name LIKE ?);');

@@ -1,6 +1,8 @@
 #! /usr/bin/perl
 $|=1 ;
-package Search;
+
+package Giraf::Modules::Search;
+
 use DBI;
 use LWP::UserAgent;
 
