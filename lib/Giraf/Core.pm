@@ -350,7 +350,7 @@ sub bbcode
 	my $bold      = "bold|b";
 	my $underline = "underline|u";
 	my $color     = "color|c";
-	my $bgcolor   = "bgcolor|bgc|color|c";
+	my $bgcolor   = "bgcolor|bgc|color";
 	my $reverse   = "reverse|r";
 	
 	foreach my $i (0..10)
@@ -361,13 +361,13 @@ sub bbcode
 		#underline
 		$msg_text =~ s/\[($underline)\](.*?)\[\/($underline)\]/\037$2\037/gi;
 
-		#color
-		$msg_text =~
-		s/\[($color)=(.*?)\](.*?)\[\/($color)\]/\003$colors->{$2}$3\003/gi;
-
 		#bgcolor
 		$msg_text =~
 		s/\[($bgcolor)=(.*?),(.*)\](.*?)\[\/($bgcolor)\]/\003$colors->{$2},$colors->{$3}$4\003/gi;
+		
+		#color
+		$msg_text =~
+		s/\[($color)=(.*?)\](.*?)\[\/($color)\]/\003$colors->{$2}$3\003/gi;
 
 		#reverse
 		$msg_text =~ s/\[($reverse)\](.*?)\[\/($reverse)\]/\026$2\026/gi;
