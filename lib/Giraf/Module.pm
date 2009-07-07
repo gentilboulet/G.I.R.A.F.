@@ -188,13 +188,13 @@ sub on_join {
 
 sub on_bot_quit {
 	my ($class,$reason)=@_;
-	my ($count,$module,$module_name,$sth);
+	my ($module,$module_name,$sth);
 
 	Giraf::Core::set_quit();
 	Giraf::Core::debug("on_bot_quit($reason)");
 
-	$sth=$_dbh->prepare("SELECT COUNT(*),file,name FROM $_tbl_modules WHERE loaded=1");
-	$sth->bind_columns( \$count, \$module , \$module_name);
+	$sth=$_dbh->prepare("SELECT file,name FROM $_tbl_modules WHERE loaded=1");
+	$sth->bind_columns( \$module , \$module_name);
 	$sth->execute();
 	
 	while($sth->fetch())
@@ -400,7 +400,40 @@ sub bot_module_main {
 
 sub bot_reload_modules
 {
+	my ($nick,$dest,$what)=@_;
+
 	Giraf::Core::debug("bot_reload_modules()");
+
+	my @return;
+	my $ligne;
+	if(is_user_auth($nick,10000) )
+	{
+		foreach my $file_pm (keys %INC) {
+			if( my ($module_name) = $file_pm =~/^Giraf\/Modules\/(.+)\.pm$/)
+			{
+				Giraf::Core::debug("Reloading module : $module_name");
+				if( module_exists($module_name) && mod_is_loaded($module_name) )
+				{
+					my $err = mod_load($module_name);       
+					mod_mark_loaded($module_name, 0);
+					mod_run($module_name, 'unload');
+					delete($INC{$file_pm});
+					$err = mod_load($module_name);
+					if ($err) {
+						print "Error while loading module \"$module_name\" ! Reason: $err\n";
+						$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] borken ! (non chargé)'};
+					}
+					else {
+						mod_run($module_name, 'init', $_kernel, $_irc); # TODO: check return
+						mod_mark_loaded($module_name, 1);
+						$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] rechargé !'};
+					}
+					push(@return,$ligne);
+				}
+			}	
+		}
+	}
+	return @return;
 }
 
 sub bot_load_module {
@@ -414,7 +447,7 @@ sub bot_load_module {
 
 		if(module_exists($module_name))
 		{
-				my $ligne;
+			my $ligne;
 			if(!mod_is_loaded($module_name))
 			{
 
@@ -425,14 +458,13 @@ sub bot_load_module {
 				}
 				else {
 					mod_run($module_name, 'init', $_kernel, $_irc); # TODO: check return
-					my $sth=$_dbh->prepare("UPDATE $_tbl_modules SET loaded=1 WHERE name LIKE ?");
-					$sth->execute($module_name);
+					mod_mark_loaded($module_name,1);
 					$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] chargé !'};
 				}
 			}
 			else
 			{
-			$ligne={action=>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] déja chargé !'};
+				$ligne={action=>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] déja chargé !'};
 			}
 			push(@return,$ligne);
 		}
@@ -459,8 +491,7 @@ sub bot_unload_module {
 		if( module_exists($module_name) )
 		{
 			mod_run($module_name, 'unload'); # TODO: check return
-			my $sth=$_dbh->prepare("UPDATE $_tbl_modules SET loaded=0 WHERE name LIKE ?");
-			$sth->execute($module_name);
+			mod_mark_loaded($module_name,0);
 			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] déchargé !'};
 			push(@return,$ligne);
 		}
@@ -593,8 +624,8 @@ sub bot_aviable_module {
 }
 
 sub bot_set_module {
-        my($nick, $dest, $what)=@_;
-        my @return;
+	my($nick, $dest, $what)=@_;
+	my @return;
 	my $regex= '(.*)\s+(.*)\s+(.*)';
 
 	Giraf::Core::debug("bot_set_module()");
