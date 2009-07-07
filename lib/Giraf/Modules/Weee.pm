@@ -13,21 +13,22 @@ our @_ovations=(['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/','\\
 
 sub init {
 	my ($kernel,$irc) = @_;
-	$Giraf::Admin::public_parsers->{bot_weee}={function=>\&bot_weee,regex=>'(\B[<>/|_\\\]o[/<>|_\\\]\B)|(\B[</|_\\\>]{2}o)|(o[/<>|_\\\]{2}\B)'};
+	Giraf::Module::register('public_parser','weee','bot_weee',\&bot_weee,'(\B[<>/|_\\\]o[/<>|_\\\]\B)|(\B[</|_\\\>]{2}o)|(o[/<>|_\\\]{2}\B)');
 }
 
 sub unload {
-	delete($Giraf::Admin::public_parsers->{bot_weee});
+	Giraf::Module::unregister('public_parser','weee','bot_weee');
 }
 
 sub bot_weee {
 	my($nick, $dest, $what)=@_;
+	Giraf::Core::debug("bot_weee()");
 	my @return;
 	my $rand=int(rand(scalar(@_ovations)));
 	my $ref=$_ovations[$rand];
 	foreach my $e (@$ref)
 	{
-		my $ligne={ action =>"MSG",dest=>$dest,msg=>"$e"};
+		my $ligne={ action =>"MSG",dest=>$dest,msg=>$e};
 		push(@return,$ligne);
 	}
 	return @return;
