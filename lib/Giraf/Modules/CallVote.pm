@@ -6,10 +6,11 @@ package Giraf::Modules::CallVote;
 use strict;
 use warnings;
 
-use Giraf::Admin;
+use Giraf::Module;
 
 use List::Util qw[min max];
 use POE;
+use Switch;
 
 # Private vars
 our $_kernel;
@@ -18,27 +19,48 @@ our $_votes;
 sub init {
 	my ($ker,$irc_session) = @_;
 	$_kernel=$ker;
-	$Giraf::Admin::public_functions->{callvote_launch}={function=>\&callvote_launch,regex=>'callvote (.*) \?\s*( +[0-9]+)?'};
-	$Giraf::Admin::public_functions->{callvote_status}={function=>\&callvote_status,regex=>'callvote status'};
-	$Giraf::Admin::public_functions->{callvote_vote}={function=>\&callvote_vote,regex=>'[fF][12]([ ]*)'};
-	$Giraf::Admin::on_nick_functions->{callvote_nick}={function=>\&callvote_nick};
+	Giraf::Module::register('public_function','callvote','callvote_main',\&callvote_main,'callvote\s+(.*)');
+	Giraf::Module::register('public_function','callvote','callvote_vote',\&callvote_vote,'[fF][12]\s*');
+	Giraf::Module::register('on_nick_function','callvote','callvote_nick',\&callvote_nick);
 }
 
 sub unload {
-	delete($Giraf::Admin::public_functions->{callvote_launch});
-	delete($Giraf::Admin::public_functions->{callvote_status});
-	delete($Giraf::Admin::public_functions->{callvote_vote});
-	delete($Giraf::Admin::on_nick_functions->{callvote_nick});
+	Giraf::Module::unregister('public_function','callvote','callvote_main');
+	Giraf::Module::unregister('public_function','callvote','callvote_vote');
+	Giraf::Module::unregister('on_nick_function','callvote','callvote_nick');
+}
+
+sub callvote_main {
+	my ($nick,$dest,$what)=@_;
+	my @return;
+	my ($sub_func,$args);
+	$what=~m/^callvote\s+(.+?)$/;
+
+	$sub_func=$1;
+
+	Giraf::Core::debug("main : sub_func=$sub_func");
+
+	switch ($sub_func)
+	{
+		case 'status'  	{       push(@return,callvote_status($nick,$dest)); }
+		else		{       push(@return,callvote_launch($nick,$dest,$sub_func)); }
+	}
+
+	return @return;
+
 }
 
 sub callvote_launch {
 	my($nick, $dest, $what)=@_;
 	my @return;
 	$dest=lc $dest;
-	if( $_votes->{$dest}->{en_cours}==0)
+	
+	Giraf::Core::debug("callvote_launch($nick,$dest,$what)");
+	
+	if(! $_votes->{$dest}->{en_cours} )
 	{
-		my ($v)=$what=~/callvote\s+(\S.*?\S?)\s+\?/ ;
-		my ($d)=$what=~/callvote\s+\S.*?\S?\s+\?\s+([0-9]+)?/;
+		my ($v)=$what=~/(\S.*?\S?)\s+\?/ ; #to detect a vote
+		my ($d)=$what=~/\S.*?\S?\s+\?\s+([0-9]+)?/; #To detect a delay
 		if($d)
 		{
 			if($d<15)
@@ -72,9 +94,12 @@ sub callvote_vote {
 	my($nick, $dest, $what)=@_;
 	my @return;
 	$dest=lc $dest;
-	if($_votes->{$dest}->{en_cours}!=0) 
+	
+	Giraf::Core::debug("callvote_vote($nick,$dest,$what)");
+
+	if($_votes->{$dest}->{en_cours}) 
 	{
-		if($_votes->{$dest}->{votants}->{$nick}==0)
+		if(!$_votes->{$dest}->{votants}->{$nick})
 		{
 			if( $what=~/[fF](1)/ )
 			{
@@ -115,7 +140,7 @@ sub callvote_status {
 	my($nick, $dest, $what)=@_;
 	my @return;
 	$dest=lc $dest;
-	if( $_votes->{$dest}->{en_cours}!=0)
+	if( $_votes->{$dest}->{en_cours})
 	{
 		my $q=$_votes->{$dest}->{question};
 		my $oui=$_votes->{$dest}->{oui};
@@ -131,7 +156,6 @@ sub callvote_status {
 
 	}
 	return @return;
-
 }
 
 sub callvote_nick {
@@ -152,11 +176,9 @@ sub callvote_nick {
 sub callvote_init {
 	my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
 	$_[KERNEL]->alias_set('callvote_core');
-	\&Giraf::debug("CallVote start !!");
 }
 
 sub callvote_stop {
-	\&Giraf::debug("CallVote stopped !!!");
 }
 
 sub vote_update {
@@ -170,8 +192,8 @@ sub vote_start {
 	my @return;
 	my $ligne={ action =>"MSG",dest=>$dest,msg=>"callvote [c=teal]$vote ?[/c]"};
 	push(@return,$ligne);
-	Giraf::emit(@return);
-	$_votes->{$dest}->{delay_id}=$kernel->delay_set( callvote_end , $_votes->{$dest}->{delay}, $dest);
+	Giraf::Core::emit(@return);
+	$_votes->{$dest}->{delay_id}=$kernel->delay_set( 'callvote_end' , $_votes->{$dest}->{delay}, $dest);
 }
 
 sub vote_end {
@@ -183,6 +205,8 @@ sub vote_end {
 	$_votes->{$dest}->{en_cours}=0;
 
 	my @return;
+	my $votants="";
+
 	if( ($oui+$non)>1)
 	{
 		$votants="s";
@@ -204,16 +228,16 @@ sub vote_end {
 		my $ligne={ action =>"MSG",dest=>$dest,msg=>"[c=teal]$vote [/c] Non (".$ratio."% de ".($oui+$non)." votant$votants)"};
 		push(@return,$ligne);
 	}
-	Giraf::emit(@return);
+	Giraf::Core::emit(@return);
 }
 
 POE::Session->create(
 	inline_states => {
-		_start => \&CallVote::callvote_init,
-		_stop => \&CallVote::callvote_stop,
-		callvote_update => \&CallVote::vote_update,
-		callvote_start => \&CallVote::vote_start,
-		callvote_end => \&CallVote::vote_end,
+		_start => \&Giraf::Modules::CallVote::callvote_init,
+		_stop => \&Giraf::Modules::CallVote::callvote_stop,
+		callvote_update => \&Giraf::Modules::CallVote::vote_update,
+		callvote_start => \&Giraf::Modules::CallVote::vote_start,
+		callvote_end => \&Giraf::Modules::CallVote::vote_end,
 	},
 );
 

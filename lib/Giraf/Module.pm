@@ -286,17 +286,19 @@ sub private_msg
 #Registration sub
 sub register {
 	my ($where_to_register,$module_name,$function_name,$function,$regex)=@_;
-	Giraf::Core::debug("Giraf::Module::register($where_to_register,$module_name,$function_name,$function,$regex)");	
+	
+	Giraf::Core::debug("Giraf::Module::register($where_to_register,$module_name,$function_name,$function)");	
+	
 	switch($where_to_register) 
 	{
 		case 'public_function' 	{	$_public_functions->{$module_name}->{$function_name}={function=>$function,regex=>$regex};	}
 		case 'public_parser' 	{	$_public_parsers->{$module_name}->{$function_name}={function=>$function,regex=>$regex};		}
-		case 'on_nick_function' {	$_on_nick_functions->{$module_name}->{$function_name}={function=>\&$function,regex=>$regex};	}
-		case 'on_join_function' {	$_on_join_functions->{$module_name}->{$function_name}={function=>\&$function,regex=>$regex};	}
-		case 'on_part_function' {	$_on_part_functions->{$module_name}->{$function_name}={function=>\&$function,regex=>$regex};	}
-		case 'on_quit_function' {	$_on_quit_functions->{$module_name}->{$function_name}={function=>\&$function,regex=>$regex};	}
+		case 'on_nick_function' {	$_on_nick_functions->{$module_name}->{$function_name}={function=>\&$function};			}
+		case 'on_join_function' {	$_on_join_functions->{$module_name}->{$function_name}={function=>\&$function};			}
+		case 'on_part_function' {	$_on_part_functions->{$module_name}->{$function_name}={function=>\&$function};			}
+		case 'on_quit_function' {	$_on_quit_functions->{$module_name}->{$function_name}={function=>\&$function};			}
 		case 'private_function' {	$_private_functions->{$module_name}->{$function_name}={function=>\&$function,regex=>$regex};	}
-		case 'private_parser'	{	$_private_parsers->{$module_name}->{$function_name}={function=>\&$function,regex=>$regex};		}
+		case 'private_parser'	{	$_private_parsers->{$module_name}->{$function_name}={function=>\&$function,regex=>$regex};	}
 	}
 }
 
@@ -378,10 +380,10 @@ sub bot_module_main {
 		case 'add'	{	push(@return,bot_add_module($nick,$dest,$args)); }
 		case 'del'	{	push(@return,bot_del_module($nick,$dest,$args)); }
 		case 'load'	{	push(@return,bot_load_module($nick,$dest,$args)); }
+		case 'set'	{	push(@return,bot_set_module($nick,$dest,$args)); }
 		case 'unload'	{	push(@return,bot_unload_module($nick,$dest,$args)); }
 		case 'reload'	{	push(@return,bot_reload_modules($nick,$dest,$args)); }
 	}
-	#eval ( 'push(@return,bot_'.$sub_func.'_module($nick,$dest,$args));');
 
 	return @return;
 }
@@ -459,7 +461,7 @@ sub bot_add_module {
 
 	Giraf::Core::debug("bot_add_module()");
 
-	my $regex= "(.+) (.+\.pm) ([0-9]*)";
+	my $regex= '(.+)\s+(.+\.pm)\s+([0-9]*)';
 	my @return;
 	if(is_user_auth($nick,10000))
 	{
@@ -506,7 +508,7 @@ sub bot_del_module {
 		{
 			if(module_exists($module_name))
 			{
-				my $sth=$_dbh->prepare("DELETE FROM $_tbl_modules WHERE name=?");
+				my $sth=$_dbh->prepare("DELETE FROM $_tbl_modules WHERE name LIKE ?");
 				$sth->execute($module_name);
 				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] retiré !'};
 				push(@return,$ligne);
@@ -571,6 +573,47 @@ sub bot_aviable_module {
 	push(@return,$ligne);
 	return @return
 }
+
+sub bot_set_module {
+        my($nick, $dest, $what)=@_;
+        my @return;
+	my $regex= '(.*)\s+(.*)\s+(.*)';
+
+	Giraf::Core::debug("bot_set_module()");
+
+	if(is_user_auth($nick,10000))
+	{
+		Giraf::Core::debug("regex=$regex : what=$what");
+		if( my ($name,$param,$value) = $what=~/^$regex$/ )
+		{
+			my $tbl_param;
+			switch($param)
+			{
+				case 'autorun'	{$tbl_param='autorun'}
+			}
+			if(module_exists($name))
+			{
+				my $sth=$_dbh->prepare("UPDATE modules SET ".$tbl_param."=? WHERE name LIKE ?");
+				$sth->execute($value,$name);
+				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] updaté ('.$param.'='.$value.') !'};
+				push(@return,$ligne);
+			}
+			else
+			{
+				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] inconnu !'};
+				push(@return,$ligne);
+			}
+		}
+		else
+		{
+			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'."$what".'[/c] non updaté ! Ligne indechiffrable !'};
+			push(@return,$ligne);
+		}
+
+	}
+	return @return
+}
+
 
 #Utility subs
 sub module_exists {
