@@ -49,8 +49,18 @@ sub mod_run {
 sub mod_mark_loaded {
 	my ($mod,$bool) = @_;
 
-	my $req = $_dbh->prepare("UPDATE $_tbl_modules SET loaded=? WHERE name = ?");
+	my $req = $_dbh->prepare("UPDATE $_tbl_modules SET loaded=? WHERE name LIKE ?");
 	$req->execute($bool,$mod);
+}
+
+sub mod_is_loaded {
+	my ($mod) =@_;
+	my $count;
+	my $sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_modules WHERE loaded=1 AND name LIKE ?");
+	$sth->bind_columns(\$count);
+	$sth->execute($mod);
+	$sth->fetch();
+	return $count;
 }
 
 sub init_sessions {
@@ -404,17 +414,25 @@ sub bot_load_module {
 
 		if(module_exists($module_name))
 		{
-			my $ligne;
-			my $err = mod_load($module_name);
-			if ($err) {
-				print "Error while loading module \"$module_name\" ! Reason: $err\n";
-				$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] borken ! (non chargé)'};
+				my $ligne;
+			if(!mod_is_loaded($module_name))
+			{
+
+				my $err = mod_load($module_name);
+				if ($err) {
+					print "Error while loading module \"$module_name\" ! Reason: $err\n";
+					$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] borken ! (non chargé)'};
+				}
+				else {
+					mod_run($module_name, 'init', $_kernel, $_irc); # TODO: check return
+					my $sth=$_dbh->prepare("UPDATE $_tbl_modules SET loaded=1 WHERE name LIKE ?");
+					$sth->execute($module_name);
+					$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] chargé !'};
+				}
 			}
-			else {
-				mod_run($module_name, 'init', $_kernel, $_irc); # TODO: check return
-				my $sth=$_dbh->prepare("UPDATE $_tbl_modules SET loaded=1 WHERE name LIKE ?");
-				$sth->execute($module_name);
-				$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] chargé !'};
+			else
+			{
+			$ligne={action=>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] déja chargé !'};
 			}
 			push(@return,$ligne);
 		}
