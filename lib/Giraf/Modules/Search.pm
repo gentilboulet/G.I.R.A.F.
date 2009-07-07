@@ -16,26 +16,34 @@ our $_ua;
 
 sub init {
 	my ($kernel,$irc) = @_;
-	$Giraf::Admin::public_functions->{bot_search}={function=>\&bot_search,regex=>'search (.*)'};
-	$Giraf::Admin::public_functions->{bot_searchn}={function=>\&bot_searchn,regex=>'searchn ([0-9]+) (.*)'};
+
+	Giraf::Module::register('public_function','search','bot_search',\&bot_search,'search\s+?(.+)');
+	Giraf::Module::register('public_function','search','bot_searchn',\&bot_searchn,'searchn\s+?[0-9]+\s+?(.+)');
 	#http://code.google.com/intl/fr/apis/ajaxsearch/documentation/reference.html#_restUrlBase
-	Giraf::Admin::set_param('Search_GoogleAPIURL','http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large');
-	Giraf::Admin::set_param('Search_GoogleSafeSearch','off');
-	$_ua=LWP::UserAgent->new;
+	Giraf::Module::set_param('Search_GoogleAPIURL','http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large');
+	Giraf::Module::set_param('Search_GoogleSafeSearch','off');
+	if(!$_ua)
+	{
+		$_ua=LWP::UserAgent->new;
+	}
 }
 
 sub unload {
-	delete($Giraf::Admin::public_functions->{bot_search});
+	Giraf::Module::unregister('public_function','search','bot_search');
+	Giraf::Module::unregister('public_function','search','bot_searchn');
 }
 
 sub bot_search {
 	my($nick, $dest, $what)=@_;
+
+	Giraf::Core::debug("bot_search()");
+
 	my @return;
-	my $referer=Admin::get_param('Search_referer');
-	my $GoogleAPIKey=Admin::get_param('Search_GoogleAPIKey');
-	my $GoogleAPIUrl=Admin::get_param('Search_GoogleAPIURL');
-	my $GoogleSafeSearch=Admin::get_param('Search_GoogleSafeSearch');
-	if( my ($search_str)= $what=~/search (.*)/)
+	my $referer=Giraf::Module::get_param('Search_referer');
+	my $GoogleAPIKey=Giraf::Module::get_param('Search_GoogleAPIKey');
+	my $GoogleAPIUrl=Giraf::Module::get_param('Search_GoogleAPIURL');
+	my $GoogleSafeSearch=Giraf::Module::get_param('Search_GoogleSafeSearch');
+	if( my ($search_str)= $what=~/search\s+?(.+)/)
 	{
 		$GoogleAPIUrl=$GoogleAPIUrl.'&key='.$GoogleAPIKey if defined $GoogleAPIKey;
 		$GoogleAPIUrl =$GoogleAPIUrl.'&safe='.$GoogleSafeSearch;
@@ -65,12 +73,15 @@ sub bot_search {
 
 sub bot_searchn {
         my($nick, $dest, $what)=@_;
-        my @return;
-        my $referer=Admin::get_param('Search_referer');
-        my $GoogleAPIKey=Admin::get_param('Search_GoogleAPIKey');
-        my $GoogleAPIUrl=Admin::get_param('Search_GoogleAPIURL');
-	my $GoogleSafeSearch=Admin::get_param('Search_GoogleSafeSearch');
-        if( my ($num,$search_str)= $what=~/searchn ([0-9]+) (.*)/)
+	
+	Giraf::Core::debug("bot_searchn()");
+        
+	my @return;
+        my $referer=Giraf::Module::get_param('Search_referer');
+        my $GoogleAPIKey=Giraf::Module::get_param('Search_GoogleAPIKey');
+        my $GoogleAPIUrl=Giraf::Module::get_param('Search_GoogleAPIURL');
+	my $GoogleSafeSearch=Giraf::Module::get_param('Search_GoogleSafeSearch');
+        if( my ($num,$search_str)= $what=~/searchn\s+?([0-9]+)\s+?(.+)/)
         {
                 $GoogleAPIUrl=$GoogleAPIUrl.'&key='.$GoogleAPIKey if defined $GoogleAPIKey;
 		$GoogleAPIUrl =$GoogleAPIUrl.'&safe='.$GoogleSafeSearch;
