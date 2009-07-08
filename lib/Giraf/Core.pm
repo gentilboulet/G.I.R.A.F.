@@ -168,7 +168,7 @@ sub irc_msg
 {
 	my ( $kernel, $sender, $who, $where, $what ) = @_[ KERNEL, SENDER, ARG0, ARG1, ARG2 ];
 	my $nick = ( split /!/, $who )[0];
-	debug("@$where:$nick : $what");
+#	debug("@$where:$nick : $what");
 	emit(Giraf::Module->private_msg( $nick, $who, $where, $what ) );
 }
 
@@ -177,7 +177,7 @@ sub irc_public
 	my ( $kernel, $sender, $who, $where, $what ) = @_[ KERNEL, SENDER, ARG0, ARG1, ARG2 ];
 	my $nick = ( split /!/, $who )[0];
 	my $channel = $where->[0];
-	debug("@$where:$nick : $what");
+#	debug("@$where:$nick : $what");
 	emit(Giraf::Module->public_msg( $nick, $channel, $what ) );
 	undef;
 }
