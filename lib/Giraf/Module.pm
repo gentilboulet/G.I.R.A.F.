@@ -385,7 +385,7 @@ sub bot_module_main {
 
 	switch ($sub_func)
 	{
-		case 'aviable' 	{	push(@return,bot_aviable_module($nick,$dest,$args)); }
+		case 'available' 	{	push(@return,bot_available_module($nick,$dest,$args)); }
 		case 'list' 	{	push(@return,bot_list_module($nick,$dest,$args)); }
 		case 'add'	{	push(@return,bot_add_module($nick,$dest,$args)); }
 		case 'del'	{	push(@return,bot_del_module($nick,$dest,$args)); }
@@ -591,10 +591,10 @@ sub bot_list_module {
 	return @return
 }
 
-sub bot_aviable_module {
+sub bot_available_module {
 	my($nick, $dest, $what)=@_;
 
-	Giraf::Core::debug("bot_aviable_module()");
+	Giraf::Core::debug("bot_available_module()");
 
 	my @return;
 	my @dir;
