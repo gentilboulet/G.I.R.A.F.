@@ -3,6 +3,8 @@ $| = 1;
 
 package Giraf::Chan;
 
+use Giraf::Core;
+
 use strict;
 use warnings;
 
@@ -31,8 +33,10 @@ sub init {
 
 sub join {
 	my ( $class, $chan ) = @_;
+	Giraf::Core::debug("Chan->join($chan)");
 	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_chans (name,joined) VALUES (?,1)");	
 	$sth->execute($chan);
+#	Giraf::Core::debug("Join _irc =$_irc ; _kernel =$_kernel");
 	$_kernel->post( $_irc => join => $chan );
 }
 
@@ -45,8 +49,10 @@ sub autorejoin {
 
 sub part {
 	my ( $class, $chan, $reason) = @_;
+#	Giraf::Core::debug("Chan->part($chan,$reason)");
 	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_chans (name,joined) VALUES (?,0)");
 	$sth->execute($chan);
+	Giraf::Core::debug("Part _irc =$_irc ; _kernel =$_kernel");
 	$_kernel->post( $_irc => part => $chan => $reason );
 }
 

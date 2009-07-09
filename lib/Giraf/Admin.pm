@@ -105,6 +105,8 @@ sub bot_admin_main {
 		case 'disable'		{	push(@return,bot_disable_module(1,$nick,$dest,$args)); }
 #		case 'promote'      {       push(@return,bot_del_module($nick,$dest,$args)); }  
 #		case 'demote'      {       push(@return,bot_del_module($nick,$dest,$args)); }
+		case 'join'		{	push(@return,bot_join($nick,$dest,$args)); }
+		case 'part'		{	push(@return,bot_part($nick,$dest,$args)); }
 	}
 
 	return @return;
@@ -146,6 +148,46 @@ sub bot_disable_module {
 			$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] inconnu ou [c=green]'.$chan.'[/c] inconnu !'};
 		}
 		push (@return,$ligne);
+	}
+	return @return;
+}
+
+sub bot_join {
+	my ($nick,$dest,$what) = @_;
+
+	Giraf::Core::debug("bot_join");
+
+	my @return;
+	my ($chan,$reason);
+
+	$what=~m/^(#\S+?)$/;
+
+	$chan=$1;
+	if( Giraf::Module::is_user_auth($nick,10000) )
+	{
+		Giraf::Chan->join($chan);
+	}
+	return @return;
+}
+
+sub bot_part {
+	my ($nick,$dest,$what) = @_;
+
+	Giraf::Core::debug("bot_part");
+
+	my @return;
+	my ($chan,$reason);
+
+	$what=~m/^(#.+?)(\s+(.+?))?$/;
+
+	$chan=$1;
+	$reason = $3;
+
+	Giraf::Core::debug("part $chan, $reason");
+
+	if( Giraf::Module::is_user_auth($nick,10000) )
+	{
+		Giraf::Chan->part($chan,$reason);
 	}
 	return @return;
 }

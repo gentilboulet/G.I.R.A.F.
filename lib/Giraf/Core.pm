@@ -19,7 +19,7 @@ use IO::Socket;
 our $version = '0.0.2';
 our $botname;                   #botname
 our $triggers;
-#our $kernel;
+our $kernel;
 our $quit=0;
 our $irc;
 
@@ -360,9 +360,8 @@ sub bbcode
 	my $bold      = "bold|b";
 	my $underline = "underline|u";
 	my $color     = "color|c";
-	my $bgcolor   = "bgcolor|bgc|color";
+	my $bgcolor   = "bgcolor|bgc";
 	my $reverse   = "reverse|r";
-	
 	foreach my $i (0..10)
 	{
 		#bold
@@ -373,7 +372,7 @@ sub bbcode
 
 		#bgcolor
 		$msg_text =~
-		s/\[($bgcolor)=(.*?),(.*)\](.*?)\[\/($bgcolor)\]/\003$colors->{$2},$colors->{$3}$4\003/gi;
+		s/\[($bgcolor)=(.*?),(.*?)\](.*?)\[\/($bgcolor)\]/\003$colors->{$2},$colors->{$3}$4\003/gi;
 		
 		#color
 		$msg_text =~
@@ -414,7 +413,6 @@ sub emit
 	my ( @tab ) = @_;
 	foreach my $ligne (@tab)
 	{
-
 		if ( $ligne->{action} eq "ACTION" )
 		{
 			$Giraf::kernel->post( $irc=> 'ctcp' => $ligne->{dest} => "ACTION " . bbcode($ligne->{msg}) );
