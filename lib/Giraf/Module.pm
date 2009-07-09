@@ -7,6 +7,8 @@ use strict;
 use warnings;
 
 use Giraf::Config;
+use Giraf::Admin;
+use Giraf::Trigger;
 
 use DBI;
 use Switch;
@@ -16,20 +18,10 @@ use Switch;
 # Private vars
 our $_kernel;
 our $_irc;
-our $_triggers;
 our $_dbh;
 our $_tbl_modules = 'modules';
 our $_tbl_users = 'users';
 our $_tbl_config = 'config';
-
-our $_public_functions;
-our $_private_functions;
-our $_on_nick_functions;
-our $_on_join_functions;
-our $_on_part_functions;
-our $_on_quit_functions;
-our $_public_parsers;
-our $_private_parsers;
 
 sub mod_load {
 	my ($mod) = @_;
@@ -53,279 +45,52 @@ sub mod_mark_loaded {
 	$req->execute($bool,$mod);
 }
 
-sub mod_is_loaded {
-	my ($mod) =@_;
-	my $count;
-	my $sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_modules WHERE loaded=1 AND name LIKE ?");
-	$sth->bind_columns(\$count);
-	$sth->execute($mod);
-	$sth->fetch();
-	return $count;
-}
-
-sub init_sessions {
-	$_dbh = DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
-	my $sth=$_dbh->prepare("SELECT file,name FROM $_tbl_modules WHERE session>0");
-        my ($module, $module_name);
-        $sth->bind_columns( \$module, \$module_name );
-        $sth->execute();
-        while($sth->fetch() )
-        {
-		require($module);
-	        eval "&".$module_name.'::init_session();';
-        }
-
-}
-
 sub init {
-	my ( $classe, $ker, $irc_session, $set_triggers) = @_;
+	my ( $classe, $ker, $irc_session ) = @_;
 	$_kernel  = $ker;
 	$_irc     = $irc_session;
-	$_triggers=$set_triggers;
 
 	my ($req);
-	
-	register('public_function','core','bot_say',\&bot_say,'say .*');
-	register('public_function','core','bot_do',\&bot_do,'do .*');
-	register('public_function','core','bot_quit',\&bot_quit,'quit.*');
-	register('public_function','module','bot_module_main',\&bot_module_main,'module.*');
 
-	$_dbh = DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
+	Giraf::Core::debug("Giraf::Module::init()");
+	
+
+	$_dbh = Giraf::Admin::get_dbh();
+	$_dbh->do("BEGIN TRANSACTION");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules (autorun NUMERIC, file TEXT PRIMARY KEY, name TEXT,session NUMERIC, loaded NUMERIC);");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_users (name TEXT PRIMARY KEY, privileges NUMERIC);");
-	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_config (name TEXT PRIMARY KEY, value TEXT);");
 	$req=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_users(name,privileges) VALUES(?,10000);");
 	$req->execute(Giraf::Config::get('botadmin'));
-
 	# Mark all modules as not loaded
 	$_dbh->do("UPDATE $_tbl_modules SET loaded=0");
+	$_dbh->do("COMMIT");
 
-	my $sth=$_dbh->prepare("SELECT file,name FROM $_tbl_modules WHERE autorun>0");
-	my ($module, $module_name);
-	$sth->bind_columns( \$module, \$module_name );
+	Giraf::Trigger::register('public_function','core','bot_say',\&bot_say,'say .*');
+	Giraf::Trigger::register('public_function','core','bot_do',\&bot_do,'do .*');
+	Giraf::Trigger::register('public_function','core','bot_quit',\&bot_quit,'quit.*');
+	Giraf::Trigger::register('public_function','core','bot_module_main',\&bot_module_main,'module.*');
+
+	my $sth=$_dbh->prepare("SELECT file,name,autorun FROM $_tbl_modules");
+	my ($module, $module_name, $autorun);
+	$sth->bind_columns( \$module, \$module_name, \$autorun );
 	$sth->execute();
 	while($sth->fetch() )
 	{
-		my $err = mod_load($module_name);
-		if ($err) {
-			print "Error while loading module \"$module_name\" ! Reason: $err\n";
-			mod_mark_loaded($module_name,0);
-		}
-		else {
-			mod_run($module_name, 'init', $ker, $irc_session);
-			# Mark module as loaded
-			mod_mark_loaded($module_name,1);
-		}
-	}
-	$_kernel->yield("connect");
-}
-
-#On event subroutines
-sub on_part {
-	my ($classe, $nick, $channel ) = @_;
-	my @return;
-	foreach my $key (keys %$_on_part_functions)
-	{
-		my $module=$_on_part_functions->{$key};
-		foreach my $func (keys %$module)
+		if($autorun > 0)
 		{
-			my $element = $module->{$func};
-			push(@return,$element->{function}->($nick,$channel));
-		}
-	}
-	return @return;
-}
-
-sub on_quit {
-	my ($classe, $nick) = @_;
-	my @return;
-	foreach my $key (keys %$_on_quit_functions)
-	{
-		my $module=$_on_quit_functions->{$key};
-		foreach my $func (keys %$module)
-		{
-			my $element = $module->{$func};
-
-			push(@return,$element->{function}->($nick));
-		}
-	}
-
-	return @return;
-}
-
-sub on_nick {
-	my ($classe, $nick, $nick_new ) = @_;
-	my @return;
-	foreach my $key (keys %$_on_nick_functions)
-	{
-		my $module=$_on_nick_functions->{$key};
-		foreach my $func (keys %$module)
-		{
-			my $element = $module->{$func};
-			push(@return,$element->{function}->($nick,$nick_new));
-
-		}
-	}
-	return @return;
-}
-
-sub on_join {
-	my ($classe, $nick, $channel ) = @_;
-	my @return;
-	foreach my $key (keys %$_on_join_functions)
-	{
-		my $module=$_on_join_functions->{$key};
-		foreach my $func (keys %$module)
-		{
-			my $element = $module->{$func};
-
-			push(@return,$element->{function}->($nick,$channel));
-		}
-	}
-
-	return @return;
-}
-
-sub on_bot_quit {
-	my ($class,$reason)=@_;
-	my ($module,$module_name,$sth);
-
-	Giraf::Core::set_quit();
-	Giraf::Core::debug("on_bot_quit($reason)");
-
-	$sth=$_dbh->prepare("SELECT file,name FROM $_tbl_modules WHERE loaded=1");
-	$sth->bind_columns( \$module , \$module_name);
-	$sth->execute();
-	
-	while($sth->fetch())
-	{
-		my $err = mod_load($module_name);	# XXX: why ??
-		mod_mark_loaded($module_name, 0);
-		mod_run($module_name, 'unload');
-		mod_run($module_name, 'quit');
-	}
-	
-	$_kernel->signal( $_kernel, 'POCOIRC_SHUTDOWN', $reason );
-	return 0;
-
-}
-
-sub public_msg
-{
-	my ($classe, $nick, $channel, $what )=@_;
-	my @return;
-
-	foreach my $key (keys %$_public_functions) 
-	{
-		my $module=$_public_functions->{$key};
-		foreach my $func (keys %$module)
-		{
-			my $element = $module->{$func};
-			#First we check for triggers
-			if(my ($arg)=($what=~/^$_triggers(.*)$/))
-			{
-				my $regex=$element->{regex};
-				if ($arg =~/^$regex$/)
-				{
-					my $ref=\&{$element->{function}};
-					push(@return,$ref->($nick,$channel,$arg));
-				}
+			my $err = mod_load($module_name);
+			if ($err) {
+				print "Error while loading module \"$module_name\" ! Reason: $err\n";
+				mod_mark_loaded($module_name,0);
+			}
+			else {
+				mod_run($module_name, 'init', $ker, $irc_session);
+				# Mark module as loaded
+				mod_mark_loaded($module_name,1);
 			}
 		}
 	}
 
-	foreach my $key (keys %$_public_parsers)
-	{
-		my $module=$_public_parsers->{$key};
-		foreach my $func (keys %$module)
-		{
-			my $element = $module->{$func};
-			#First we check for triggers
-			my $regex=$element->{regex};
-			if ($what =~/$regex/)
-			{
-				my $ref=\&{$element->{function}};
-				push(@return,$ref->($nick,$channel,$what));
-			}
-		}
-	}
-	return @return;
-
-}
-
-sub private_msg
-{
-	my ($classe, $nick, $who, $where, $what )=@_;
-	my @return;
-	foreach my $key (keys %$_private_functions) 
-	{
-		my $module=$_private_functions->{$key};
-		foreach my $func (keys %$module)
-		{
-			my $element = $module->{$func};
-			#First we check for triggers
-			if(my ($arg)=($what=~/^$_triggers(.*)$/))
-			{
-				my $regex=$element->{regex};
-				if ($arg =~/^$regex$/)
-				{
-					push(@return,$element->{function}->($nick,$where,$arg));
-				}
-			}
-		}
-
-	}
-	foreach my $key (keys %$_private_parsers)
-	{
-		my $module=$_private_parsers->{$key};
-		foreach my $func (keys %$module)
-		{
-			my $element = $module->{$func};
-
-			my $regex=$element->{regex};
-			if ($what =~/$regex/)
-			{
-				push(@return,$element->{function}->($nick,$where,$what));
-			}
-		}
-		return @return;
-
-	}
-}
-
-#Registration sub
-sub register {
-	my ($where_to_register,$module_name,$function_name,$function,$regex)=@_;
-	
-	Giraf::Core::debug("Giraf::Module::register($where_to_register,$module_name,$function_name,$function)");	
-	
-	switch($where_to_register) 
-	{
-		case 'public_function' 	{	$_public_functions->{$module_name}->{$function_name}={function=>$function,regex=>$regex};	}
-		case 'public_parser' 	{	$_public_parsers->{$module_name}->{$function_name}={function=>$function,regex=>$regex};		}
-		case 'on_nick_function' {	$_on_nick_functions->{$module_name}->{$function_name}={function=>\&$function};			}
-		case 'on_join_function' {	$_on_join_functions->{$module_name}->{$function_name}={function=>\&$function};			}
-		case 'on_part_function' {	$_on_part_functions->{$module_name}->{$function_name}={function=>\&$function};			}
-		case 'on_quit_function' {	$_on_quit_functions->{$module_name}->{$function_name}={function=>\&$function};			}
-		case 'private_function' {	$_private_functions->{$module_name}->{$function_name}={function=>\&$function,regex=>$regex};	}
-		case 'private_parser'	{	$_private_parsers->{$module_name}->{$function_name}={function=>\&$function,regex=>$regex};	}
-	}
-}
-
-sub unregister {
-	my ($where_to_register,$module_name,$function_name)=@_;
-	Giraf::Core::debug("Giraf::Module::unregister($where_to_register,$module_name,$function_name)");	
-	switch($where_to_register)
-	{
-		case 'public_function'  {       delete($_public_functions->{$module_name}->{$function_name});	}
-		case 'public_parser'    {       delete($_public_parsers->{$module_name}->{$function_name});	}
-		case 'on_nick_function' {       delete($_on_nick_functions->{$module_name}->{$function_name});}
-		case 'on_join_function' {           delete($_on_join_functions->{$module_name}->{$function_name}); }
-		case 'on_part_function' {           delete($_on_part_functions->{$module_name}->{$function_name}); }
-		case 'on_quit_function' {           delete($_on_quit_functions->{$module_name}->{$function_name}); }
-		case 'private_function' {           delete($_private_functions->{$module_name}->{$function_name}); }
-		case 'private_parser'  {            delete($_private_parsers->{$module_name}->{$function_name});}
-	}
 }
 
 #Basic module sub
@@ -362,11 +127,10 @@ sub bot_quit {
 		{
 			$reason=$1;
 		}
-		Giraf::Module->on_bot_quit($reason);
+		Giraf::Trigger->on_bot_quit($reason);
 	}
 	return @return
 }
-
 
 #modules s methods
 sub bot_module_main {
@@ -412,7 +176,7 @@ sub bot_reload_modules
 			if( my ($module_name) = $file_pm =~/^Giraf\/Modules\/(.+)\.pm$/)
 			{
 				Giraf::Core::debug("Reloading module : $module_name");
-				if( module_exists($module_name) && mod_is_loaded($module_name) )
+				if( module_exists($module_name) && module_loaded($module_name) )
 				{
 					my $err = mod_load($module_name);       
 					mod_mark_loaded($module_name, 0);
@@ -448,7 +212,7 @@ sub bot_load_module {
 		if(module_exists($module_name))
 		{
 			my $ligne;
-			if(!mod_is_loaded($module_name))
+			if(!module_loaded($module_name))
 			{
 
 				my $err = mod_load($module_name);
@@ -492,6 +256,7 @@ sub bot_unload_module {
 		{
 			mod_run($module_name, 'unload'); # TODO: check return
 			mod_mark_loaded($module_name,0);
+			delete($INC{'Giraf/Modules/'.$module_name.'.pm'});
 			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] déchargé !'};
 			push(@return,$ligne);
 		}
@@ -663,6 +428,27 @@ sub bot_set_module {
 	return @return
 }
 
+sub modules_on_quit {
+        my ($module,$module_name,$sth);
+
+        Giraf::Core::set_quit();
+        Giraf::Core::debug("modules_on_quit()");
+
+        $sth=$_dbh->prepare("SELECT file,name FROM $_tbl_modules WHERE loaded=1");
+        $sth->bind_columns( \$module , \$module_name);
+        $sth->execute();
+
+        while($sth->fetch())
+        {
+                my $err = mod_load($module_name);       # XXX: why ??
+                mod_mark_loaded($module_name, 0);
+                mod_run($module_name, 'unload');
+                mod_run($module_name, 'quit');
+        }
+
+        return 0;
+
+}
 
 #Utility subs
 sub module_exists {
@@ -679,6 +465,17 @@ sub module_exists {
 
 }
 
+sub module_loaded {
+	my ($mod) =@_;
+	my $count;
+	my $sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_modules WHERE loaded=1 AND name LIKE ?");
+	$sth->bind_columns(\$count);
+	$sth->execute($mod);
+	$sth->fetch();
+	return $count;
+}
+
+
 #TEMPORARY while no User module
 sub is_user_auth {
 	my ($username,$level) = @_;
@@ -690,26 +487,5 @@ sub is_user_auth {
 	$sth->execute($username,$level);
 	$sth->fetch();
 	return $count;
-}
-
-#Parameter value
-sub set_param
-{
-	my ($param,$value)=@_;
-	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_config(name,value) VALUES(?,?)");
-	$sth->execute($param,$value);
-	return $param;
-}
-
-sub get_param
-{
-	my ($what)=@_;
-	my $value;
-	my $sth=$_dbh->prepare("SELECT value FROM $_tbl_config WHERE name LIKE ?");
-	$sth->bind_columns(\$value);
-	$sth->execute($what);
-	$sth->fetch();
-	return $value;
-
 }
 1;

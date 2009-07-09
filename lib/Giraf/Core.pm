@@ -5,8 +5,10 @@ use strict;
 use warnings;
 
 use Giraf::Config;
+use Giraf::Admin;
+use Giraf::User;
 use Giraf::Chan;
-use Giraf::Module;
+use Giraf::Trigger;
 
 use POSIX;
 use POE qw(Component::IRC);
@@ -17,7 +19,7 @@ use IO::Socket;
 our $version = '0.0.2';
 our $botname;                   #botname
 our $triggers;
-our $kernel;
+#our $kernel;
 our $quit=0;
 our $irc;
 
@@ -28,8 +30,6 @@ sub init {
 
 	$botname = Giraf::Config::get('botnick');
 	$triggers = Giraf::Config::get('triggers');
-
-	#Giraf::Module->init_sessions();
 
 	return 1;
 }
@@ -69,6 +69,7 @@ sub run {
 				irc_join         => "irc_join",
 				irc_quit         => "irc_quit",
 				irc_mode	 => "irc_mode",
+				irc_kick	 => "irc_kick",
 			],
 		],
 		heap => { irc => $irc },
@@ -90,6 +91,7 @@ sub irc_001
 	foreach my $nom ( @{ Giraf::Config::get('botchan') } )
 	{
 		Giraf::Chan->join($nom);
+		Giraf::Chan->autorejoin($nom,1); #activate autorejoin
 	}
 	undef;
 }
@@ -99,7 +101,7 @@ sub irc_433
 	my ($kernel) = $_[KERNEL];
 	$botname = "Mr_Bobby";
 	$kernel->post( $irc => nick => $botname );
-	Giraf::Chan->init( $kernel, $irc, $botname );
+#	Giraf::Chan->init( $kernel, $irc, $botname );
 	debug($botname);
 	sleep 1;
 }
@@ -160,7 +162,7 @@ sub irc_join
 {
 	my ( $kernel, $sender, $who, $where ) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
 	my $nick = ( split /!/, $who )[0];
-	Giraf::Chan->add_user( $where, $nick );
+	#Giraf::Chan->add_user( $where, $nick );
 	debug("$nick join $where");
 }
 
@@ -169,7 +171,7 @@ sub irc_msg
 	my ( $kernel, $sender, $who, $where, $what ) = @_[ KERNEL, SENDER, ARG0, ARG1, ARG2 ];
 	my $nick = ( split /!/, $who )[0];
 #	debug("@$where:$nick : $what");
-	emit(Giraf::Module->private_msg( $nick, $who, $where, $what ) );
+	emit(Giraf::Trigger->private_msg( $nick, $who, $where, $what ) );
 }
 
 sub irc_public
@@ -178,7 +180,7 @@ sub irc_public
 	my $nick = ( split /!/, $who )[0];
 	my $channel = $where->[0];
 #	debug("@$where:$nick : $what");
-	emit(Giraf::Module->public_msg( $nick, $channel, $what ) );
+	emit(Giraf::Trigger->public_msg( $nick, $channel, $what ) );
 	undef;
 }
 
@@ -192,7 +194,7 @@ sub irc_names
 	foreach my $k (@users_list)
 	{
 		debug( "Sur " . $chan . " il y a {" . $k . "}" );
-		Giraf::Chan->add_user( $chan, $k );
+		#Giraf::Chan->add_user( $chan, $k );
 	}
 }
 
@@ -201,8 +203,8 @@ sub irc_nick
 	my ( $kernel, $sender, $who, $new_nick ) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
 	my $nick = ( split /!/, $who )[0];
 	debug("nick_user($nick,$new_nick);"); 
-	Giraf::Chan->nick_user( $nick, $new_nick );
-	emit(Giraf::Module->on_nick( $nick, $new_nick ) );
+	#Giraf::Chan->nick_user( $nick, $new_nick );
+	emit(Giraf::Trigger->on_nick( $nick, $new_nick ) );
 }
 
 sub irc_notice
@@ -217,7 +219,7 @@ sub irc_part
 {
 	my ( $kernel, $sender, $who, $where ) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
 	my $nick = ( split /!/, $who )[0];
-	Giraf::Chan->part_user( $where, $nick );
+	#Giraf::Chan->part_user( $where, $nick );
 	debug("$nick part $where");
 }
 
@@ -225,8 +227,13 @@ sub irc_quit
 {
 	my ( $kernel, $sender, $who, $message ) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
 	my $nick = ( split /!/, $who )[0];
-	Giraf::Chan->quit_user($who);
+	#Giraf::Chan->quit_user($who);
 	debug("$nick quit : $message");
+}
+
+sub irc_kick
+{
+	my ( $kernel, $sender, $kicker, $where, $kicked, $reason ) = @_[ KERNEL, SENDER, ARG0, ARG1, ARG2, ARG3 ];
 }
 
 sub irc_mode
@@ -241,7 +248,7 @@ sub irc_mode
 		else {
 			debug("chan_mode : $what,$mode_string");
 		}
-		Giraf::Chan->chan_mode($what,$mode_string,$args);
+		#Giraf::Chan->chan_mode($what,$mode_string,$args);
 	}
 	else
 	{
@@ -251,7 +258,7 @@ sub irc_mode
 		else {
 			debug("user_mode : $what,$mode_string");
 		}
-		Giraf::Chan->user_mode($what,$mode_string,$args);
+		#Giraf::Chan->user_mode($what,$mode_string,$args);
 	}
 
 }
@@ -270,7 +277,7 @@ sub sigint
 	set_quit();
 	$kernel->sig('INT');
 	$kernel->sig_handled();
-	Giraf::Module->on_bot_quit('Adieu monde cruel!');
+	Giraf::Trigger->on_bot_quit('Adieu monde cruel!');
 }
 
 sub irc_socketerr
@@ -294,10 +301,13 @@ sub _start
 	$kernel->post( $irc_session => register => 'all' );
 	$kernel->post( $irc_session => connect => {} );
 	undef;
+	Giraf::Admin->init( $kernel, $irc);
 	Giraf::Chan->init( $kernel,  $irc ,$botname);
-	Giraf::Module->init( $kernel, $irc ,$triggers);
+	Giraf::Trigger->init( $kernel, $irc ,$triggers);
+	Giraf::Module->init( $kernel,  $irc);
 	$kernel->post ($irc_session =>  'privmsg' => nickserv => "IDENTIFY ".Giraf::Config::get('botpass'));
 	$kernel->sig( INT => "sigint" );
+	#$kernel->yield("connect");
 }
 
 sub _stop

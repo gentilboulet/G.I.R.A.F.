@@ -7,459 +7,169 @@ use strict;
 use warnings;
 
 use Giraf::Config;
+use Giraf::Module;
+use Giraf::Chan;
+use Giraf::User;
+use Giraf::Trigger;
 
 use DBI;
+use Switch;
 
 # Public vars
-our $public_functions;
-our $private_functions;
-our $on_nick_functions;
-our $on_join_functions;
-our $on_part_functions;
-our $on_quit_functions;
-our $public_parsers;
-our $private_parsers;
 
 # Private vars
 our $_kernel;
 our $_irc;
-our $_triggers;
 our $_dbh;
-our $_tbl_modules = 'modules';
-our $_tbl_users = 'users';
-our $_tbl_config = 'config';
-
-sub mod_load {
-	my ($mod) = @_;
-	
-	eval ("require Giraf::Modules::$mod;");
-	return $@;
-}
-
-sub mod_run {
-	my ($mod, $fn, @args) = @_;
-	my $ret;
-
-	eval ('$ret = ' . '&Giraf::Modules::' . $mod . '::' . $fn . '(@args);');
-	return $ret;
-}
-
-sub init_sessions {
-	$_dbh = DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
-	my $sth=$_dbh->prepare("SELECT file,name FROM $_tbl_modules WHERE session>0");
-        my ($module, $module_name);
-        $sth->bind_columns( \$module, \$module_name );
-        $sth->execute();
-        while($sth->fetch() )
-        {
-		require($module);
-	        eval "&".$module_name.'::init_session();';
-        }
-
-}
+our $_botname;
+our $_tbl_config='config';
+our $_tbl_modules_access='modules_access';
+our $_tbl_users;
+our $_tbl_chans;
+our $_tbl_modules;
+our $_auth_modules;
 
 sub init {
-	my ( $classe, $ker, $irc_session, $set_triggers) = @_;
+	my ( $classe, $ker, $irc_session, $botname) = @_;
 	$_kernel  = $ker;
 	$_irc     = $irc_session;
-	$_triggers=$set_triggers;
-	$public_functions->{bot_say}={function=>\&bot_say,regex=>'say (.*)'};
-	$public_functions->{bot_do}={function=>\&bot_do,regex=>'do (.*)'};
-	$public_functions->{bot_load_module}={function=>\&bot_load_module,regex=>'module load (.+)'};
-	$public_functions->{bot_unload_module}={function=>\&bot_unload_module,regex=>'module unload (.+)'};
-	$public_functions->{bot_add_module}={function=>\&bot_add_module,regex=>'module add (.+)'};
-	$public_functions->{bot_del_module}={function=>\&bot_del_module,regex=>'module del (.+)'};
-	$public_functions->{bot_list_module}={function=>\&bot_list_module,regex=>'module list'};
-	$public_functions->{bot_quit}={function=>\&bot_quit,regex=>'quit(.*)'};
-	$public_functions->{bot_reload_modules}={function=>\&bot_reload_modules,regex=>'module reload'};
+	$_botname = $botname;
 
-	$_dbh = DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
-	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules (autorun NUMERIC, file TEXT, name TEXT,session NUMERIC, loaded NUMERIC);");
-	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_users (name TEXT PRIMARY KEY, privileges NUMERIC);");
+	Giraf::Core::debug("Giraf::Admin::init()");
+	
+	$_tbl_users=$Giraf::User::_tbl_users;
+	$_tbl_chans=$Giraf::Chan::_tbl_chans;
+	$_tbl_modules=$Giraf::Module::_tbl_modules;
+
+	$_dbh=get_dbh();
+	$_dbh->do("BEGIN TRANSACTION");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_config (name TEXT PRIMARY KEY, value TEXT);");
-	$_dbh->do("INSERT INTO $_tbl_users(name,privileges) VALUES('GentilBoulet',0);");
+	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules_access (module_name TEXT REFERENCES $_tbl_modules (name), chan_name TEXT REFERENCES $_tbl_chans (name), disabled NUMERIC DEFAULT 0, UNIQUE (module_name,chan_name) );");
+	$_dbh->do("COMMIT");
 
-	# Mark all modules as not loaded
-	$_dbh->do("UPDATE $_tbl_modules SET loaded=0");
-
-	my $sth=$_dbh->prepare("SELECT file,name FROM $_tbl_modules WHERE autorun>0");
-	my ($module, $module_name);
-	$sth->bind_columns( \$module, \$module_name );
-	$sth->execute();
-	while($sth->fetch() )
-	{
-		my $err = mod_load($module_name);
-		if ($err) {
-			print "Error while loading module \"$module_name\" ! Reason: $err\n";
-		}
-		else {
-			mod_run($module_name, 'init', $ker, $irc_session);
-			# Mark module as loaded
-			my $req = $_dbh->prepare("UPDATE $_tbl_modules SET loaded=1 WHERE name = ?");
-			$req->execute($module_name);
-		}
-	}
-	$_kernel->yield("connect");
+	Giraf::Trigger::register('public_function','core','bot_admin_main',\&bot_admin_main,'admin.*');
+	Giraf::Admin::module_authorized_update();
 }
 
-sub on_part {
-	my ($classe, $nick, $channel ) = @_;
-	my @return;
-        foreach my $key (keys %$on_part_functions)
-	{
-		my $element=$on_part_functions->{$key};
-		push(@return,$element->{function}->($nick,$channel));
-	}
-
-	return @return;
-}
-
-sub on_quit {
-	my ($classe, $nick) = @_;
-	my @return;
-        foreach my $key (keys %$on_quit_functions)
-	{
-		my $element=$on_quit_functions->{$key};
-		push(@return,$element->{function}->($nick));
-	}
-
-	return @return;
-}
-
-sub on_nick {
-	my ($classe, $nick, $nick_new ) = @_;
-	my @return;
-	foreach my $key (keys %$on_nick_functions)
-	{
-		my $element=$on_nick_functions->{$key};
-		push(@return,$element->{function}->($nick,$nick_new));
-	}
-	return @return;
-}
-
-sub on_join {
-	my ($classe, $nick, $channel ) = @_;
-	my @return;
-	foreach my $key (keys %$on_join_functions)
-	{
-		my $element=$on_join_functions->{$key};
-		push(@return,$element->{function}->($nick,$channel));
-	}
-
-	return @return;
-}
-
-sub on_bot_quit {
-	my ($classe,$reason)=@_;
-	my ($count,$module,$module_name,$sth);
-        Giraf::Core::set_quit();
-	$sth=$_dbh->prepare("SELECT COUNT(*),file,name FROM $_tbl_modules WHERE loaded=1");
-
-	$sth->bind_columns( \$count, \$module , \$module_name);
-	$sth->execute();
-	while($sth->fetch())
-	{
-		my $err = mod_load($module_name);	# XXX: why ??
-		$sth=$_dbh->prepare("UPDATE $_tbl_modules SET loaded=0 WHERE name LIKE ?");
-		$sth->execute($module_name);
-		mod_run($module_name, 'unload');
-		mod_run($module_name, 'quit');
-	}
-	$_kernel->signal( $_kernel, 'POCOIRC_SHUTDOWN', $reason );
-	return 0;
-
-}
-
-sub public_msg
-{
-	my ($classe, $nick, $channel, $what )=@_;
-	my @return;
-
-	foreach my $key (keys %$public_functions) 
-	{
-		my $element=$public_functions->{$key};
-		my $regex=$_triggers.$element->{regex};
-		if ($what =~/^$regex$/)
-		{
-			push(@return,$element->{function}->($nick,$channel,$what));
-		}
-	}
-	foreach my $key (keys %$public_parsers)
-	{
-		my $element=$public_parsers->{$key};
-		my $regex=$element->{regex};
-		if ($what =~/$regex/)
-		{
-			push(@return,$element->{function}->($nick,$channel,$what));
-		}
-	}
-	return @return;
-
-}
-
-sub private_msg
-{
-	my ($classe, $nick, $who, $where, $what )=@_;
-	my @return;
-	foreach my $key (keys %$private_functions) 
-	{
-		my $element=$private_functions->{$key};
-		my $regex=$_triggers.$element->{regex};
-		if ($what =~/^$regex$/)
-		{
-			push(@return,$element->{function}->($nick,$nick,$what));
-		}
-	}
-	foreach my $key2 (keys %$private_parsers)
-	{
-		my $element=$private_parsers->{$key2};
-		my $regex=$element->{regex};
-		if ($what =~/$regex/)
-		{
-			push(@return,$element->{function}->($nick,$where,$what));
-		}
-	}
-	return @return;
-
-}
-
-sub set_param
-{
+#Utility subs
+sub set_param {
 	my ($param,$value)=@_;
+
+	Giraf::Core::debug("Giraf::Admin::set_param($param,$value)");
+
 	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_config(name,value) VALUES(?,?)");
 	$sth->execute($param,$value);
 	return $param;
 }
 
-sub get_param
-{
-	my ($what)=@_;
+sub get_param {
+	my ($name) = @_;
+	
+	Giraf::Core::debug("Giraf::Admin::get_param($name)");
+	
 	my $value;
 	my $sth=$_dbh->prepare("SELECT value FROM $_tbl_config WHERE name LIKE ?");
 	$sth->bind_columns(\$value);
-	$sth->execute($what);
+	$sth->execute($name);
 	$sth->fetch();
 	return $value;
-
 }
 
-sub bot_say {
-	my($nick, $dest, $what)=@_;
-	my @return;
-	my $regex= $_triggers."say (.*)";
-	my ($txt) = $what=~/$regex/ ;
-	my $ligne={ action =>"MSG",dest=>$dest,msg=>$txt};
-	push(@return,$ligne);
-	return @return;
-}
-
-sub bot_do {
-	my($nick, $dest, $what)=@_;
-	my @return;
-	my $regex= $_triggers."do (.*)";
-	my ($txt) = $what=~/$regex/ ;
-	my $ligne={ action =>"ACTION",dest=>$dest,msg=>$txt};
-	push(@return,$ligne);
-	return @return;
-}
-
-sub bot_reload_modules
-{
-	Giraf::debug('AACallVote start !!');
-	Giraf::debug('BBCallVote start !!');
-}
-
-sub bot_load_module {
-	my($nick, $dest, $what)=@_;
-	my @return;
-	my $regex= $_triggers."module load (.+)";
-	my $sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_users WHERE name LIKE ? AND privileges >= 10000");
-	my $count;
-	$sth->bind_columns( \$count);
-	$sth->execute($nick);
-	$sth->fetch();
-	if($count > 0)
+sub get_dbh {
+	if( !$_dbh )
 	{
-
-		$sth=$_dbh->prepare("SELECT COUNT(*),file,name FROM $_tbl_modules WHERE name LIKE ?");
-		my ($module,$module_name);
-		$sth->bind_columns( \$count, \$module , \$module_name);
-		if( my ($txt) = $what=~/$regex/ )
-		{
-			$sth->execute($txt);
-			$sth->fetch();
-			if($count > 0)
-			{
-				my $ligne;
-				my $err = mod_load($module_name);
-				if ($err) {
-					print "Error while loading module \"$module_name\" ! Reason: $err\n";
-					$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] borken ! (non chargé)'};
-				}
-				else {
-					mod_run($module_name, 'init', $_kernel, $_irc); # TODO: check return
-					$sth=$_dbh->prepare("UPDATE $_tbl_modules SET loaded=1 WHERE name LIKE ?");
-					$sth->execute($txt);
-					$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] chargé !'};
-				}
-				push(@return,$ligne);
-			}
-			else
-			{
-				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] non trouve !'};
-				push(@return,$ligne);
-			}
-		}
+		$_dbh=DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
 	}
-	return @return;
+	return $_dbh;
 }
 
+#Admin subs
+sub bot_admin_main {
+	my ($nick,$dest,$what)=@_;
 
-sub bot_unload_module {
-	my($nick, $dest, $what)=@_;
+	Giraf::Core::debug("bot_admin_main");
+
 	my @return;
-	my $regex= $_triggers."module unload (.+)";
-	my $sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_users WHERE name LIKE ? AND privileges >= 10000");
-	my $count;
-	$sth->bind_columns( \$count);
-	$sth->execute($nick);
-	$sth->fetch();
-	if($count > 0)
+	my ($sub_func,$args);
+	$what=~m/^admin\s+(.+?)(\s+(.+))?$/;
+
+	$sub_func=$1;
+	$args=$3;
+
+	Giraf::Core::debug("admin main : sub_func=$sub_func");
+
+	switch ($sub_func)
 	{
-		$sth=$_dbh->prepare("SELECT COUNT(*),file,name FROM $_tbl_modules WHERE name LIKE ?");
-		my ($module,$module_name);
-		$sth->bind_columns( \$count, \$module , \$module_name);
-		if( my ($txt) = $what=~/$regex/ )
-		{
-			$sth->execute($txt);
-			$sth->fetch();
-			if($count > 0)
-			{
-				mod_run($module_name, 'unload'); # TODO: check return
-				$sth=$_dbh->prepare("UPDATE $_tbl_modules SET loaded=0 WHERE name LIKE ?");
-				$sth->execute($txt);
-				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] déchargé !'};
-				push(@return,$ligne);
-			}
-			else
-			{
-				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$txt.'[/c] non trouve !'};
-				push(@return,$ligne);
-			}
-		}
+#		case 'ignore'{       push(@return,bot_ignore_user($nick,$dest,$args)); }
+		case 'enable'		{	push(@return,bot_disable_module(0,$nick,$dest,$args)); }
+		case 'disable'		{	push(@return,bot_disable_module(1,$nick,$dest,$args)); }
+#		case 'promote'      {       push(@return,bot_del_module($nick,$dest,$args)); }  
+#		case 'demote'      {       push(@return,bot_del_module($nick,$dest,$args)); }
 	}
+
 	return @return;
 }
 
+sub bot_disable_module {
+	my ($disabled,$nick,$dest,$what) = @_;
 
-sub bot_add_module {
-	my($nick, $dest, $what)=@_;
-	my $sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_users WHERE name LIKE ? AND privileges >= 10000");
-	my $regex= $_triggers."module add (.+) (.+\.pm) ([0-9]*)";
-	my $count;
+	Giraf::Core::debug("bot_disable_module");
+
 	my @return;
-	$sth->bind_columns( \$count);
-	$sth->execute($nick);
-	$sth->fetch();
-	if($count > 0)
-	{
-		$sth=$_dbh->prepare("INSERT INTO $_tbl_modules (name,file,autorun) VALUES (?,?,?)");
-		if( my ($name,$file,$autorun) = $what=~/$regex/ )
-		{
-			if( -e "lib/Giraf/Modules/".$file )
-			{
+	my ($ligne,$chan,$module_name);
 
-				$sth->execute($name,$file,$autorun);
-				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] ajoute !'};
-				push(@return,$ligne);
+	$what=~m/^(#.+?)\s+(.+?)$/;
+
+	$chan=$1;
+	$module_name=$2;
+
+	if(Giraf::Module::is_user_auth($nick,10000) && $module_name ne 'core')
+	{
+		if(Giraf::Module::module_exists($module_name) && Giraf::Chan::known_chan($chan) )
+		{
+			my $mot;
+			if(!$disabled)
+			{
+				$mot="activé";
 			}
 			else
 			{
-				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] non ajoute ! Fichier non existant !'};
-				push(@return,$ligne);
+				$mot="desactivé";
 			}
+			my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_modules_access (module_name,chan_name,disabled) VALUES (?,?,?)");
+			$sth->execute($module_name,$chan,$disabled);
+			$_auth_modules->{$chan}->{$module_name}={disabled=>$disabled};
+			$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] '.$mot.' pour [c=green]'.$chan.'[/c]!'};
 		}
 		else
-		{	
-			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'."$name $file $autorun".'[/c] non ajoute ! Ligne indechiffrable !'};
-			push(@return,$ligne);
+		{
+			$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] inconnu ou [c=green]'.$chan.'[/c] inconnu !'};
 		}
-
+		push (@return,$ligne);
 	}
-	return @return
+	return @return;
 }
 
-sub bot_del_module {
-	my($nick, $dest, $what)=@_;
-	my $sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_users WHERE name LIKE ? AND privileges >= 10000");
-	my $regex= $_triggers."module del (.+)";
-	my $count;
-	my @return;
-
-	$sth->bind_columns( \$count);
-	$sth->execute($nick);
-	$sth->fetch();
-
-	if($count > 0)
-	{
-		my ($name) = $what=~/$regex/;
-		if (!$name)
-		{
-			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'."$name".'[/c] non retiré ! Ligne indechiffrable !'};
-			push(@return,$ligne);
-		}
-	 	else 
-		{
-			$sth=$_dbh->prepare("DELETE FROM $_tbl_modules WHERE name=?");
-			$sth->execute($name);
-			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] retiré !'};
-			push(@return,$ligne);
-		}
-	}
-	return @return
-
+#Admin utility subs
+sub module_authorized {
+	my ($module_name,$chan) = @_;
+	return (!$_auth_modules->{$chan}->{$module_name}->{disabled});
 }
 
-sub bot_list_module {
-	my($nick, $dest, $what)=@_;
-	my $sth=$_dbh->prepare("SELECT name,autorun,session,loaded FROM $_tbl_modules");
-	my $regex= $_triggers."module list";
-	my @return;
-	my $name; 
-	my $autorun;
-	my $session;
-	my $loaded;
-	$sth->bind_columns( \$name, \$autorun, \$session, \$loaded);
+sub module_authorized_update {
+
+	Giraf::Core::debug("module_authorized_update()");
+
+	undef $_auth_modules;
+
+	my ($disabled,$module_name,$chan);
+	my $sth=$_dbh->prepare("SELECT disabled,module_name,chan_name FROM $_tbl_modules_access");
+	$sth->bind_columns(\$disabled,\$module_name,\$chan);
 	$sth->execute();
 	while($sth->fetch())
 	{
-		my $ligne= {action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] : autorun=[color=orange]'.$autorun.'[/color];loaded=[c=teal]'.$loaded.'[/c]'};
-		push(@return,$ligne);
+		$_auth_modules->{$chan}->{$module_name}={disabled=>$disabled};
 	}
-	return @return
-
-}
-
-
-sub bot_quit {
-	my($nick, $dest, $what)=@_;
-	my $sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_users WHERE name LIKE ? AND privileges >= 10000");
-	my $count;
-	my @return;
-	$sth->bind_columns( \$count);
-	$sth->execute($nick);
-	$sth->fetch();
-	my $regex= $_triggers."quit (\\S.*)";
-	if($count > 0)
-	{
-		my $reason="All your bot are belong to us";
-		if($what=~/$regex/ )
-		{
-			$reason=$1;
-		}
-		on_bot_quit($reason);
-	}
-	return @return
 }
 
 1;
