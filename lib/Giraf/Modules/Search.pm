@@ -94,15 +94,16 @@ sub bot_searchn {
                 my $request=$_ua->get($GoogleAPIUrl,referer=>$referer);
                 if($request->is_success)
                 {
-                        my $data=$request->content;
+                        my $data=$request->decoded_content;
                         #Parsing JSON
                         my $regex_single="{\"GsearchResultClass\":\"GwebSearch\",\"unescapedUrl\":\"(.*?)\",\"url\":\"(.*?)\",\"visibleUrl\":\"(.*?)\",\"cacheUrl\":\"(.*?)\",\"title\":\"(.*?)\",\"titleNoFormatting\":\"(.*?)\",\"content\":\"(.*?)\"}";
 			my $matchednum=0;
+			$data=json_decode($data);
                         while($data=~m/$regex_single/g && $matchednum<=4 && $matchednum < $num)
                         {
 				$matchednum++;		
                                 my ($unescapedUrl,$url,$visibleUrl,$cacheUrl,$title,$titleNoFormatting,$content) = ($1,$2,$3,$4,$5,$6,$7);
-                                my $ligne= {action =>"MSG",dest=>$dest,msg=>'[c=purple]'.$matchednum.'[/c] : [b]'.$titleNoFormatting.'[/b] - [c=teal]'.json_decode($unescapedUrl).'[/c]'};
+                                my $ligne= {action =>"MSG",dest=>$dest,msg=>'[c=purple]'.$matchednum.'[/c] : [b]'.xhtml_decode($titleNoFormatting).'[/b] - [c=teal]'.$unescapedUrl.'[/c]'};
                                 push(@return,$ligne);
                         }
 			
@@ -118,10 +119,20 @@ sub bot_searchn {
 
 sub json_decode {
 	my ($data)=@_;
+	
 	$data=~s/\\u003e/\>/g;
 	$data=~s/\\u003d/=/g;
-	$data=~s/\\u0026/\\\&/g;
+	$data=~s/\\u0026/\&/g;
 	$data=~s/\\u003c/\</g;
 	return $data;
 }
+
+sub xhtml_decode {
+	my ($data) = @_;
+	Giraf::Core::debug($data);
+	$data=~s/\&#39\;/\'/g;
+	Giraf::Core::debug($data);
+	return $data;
+}
+
 1;
