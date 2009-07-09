@@ -6,7 +6,7 @@ package Giraf::Modules::CallVote;
 use strict;
 use warnings;
 
-use Giraf::Module;
+use Giraf::Trigger;
 
 use List::Util qw[min max];
 use POE;
@@ -19,15 +19,21 @@ our $_votes;
 sub init {
 	my ($ker,$irc_session) = @_;
 	$_kernel=$ker;
-	Giraf::Module::register('public_function','callvote','callvote_main',\&callvote_main,'callvote\s+(.+?)');
-	Giraf::Module::register('public_function','callvote','callvote_vote',\&callvote_vote,'[fF][12]\s*');
-	Giraf::Module::register('on_nick_function','callvote','callvote_nick',\&callvote_nick);
+
+	Giraf::Core::debug("Giraf::Modules::CallVote::init()");
+
+	Giraf::Trigger::register('public_function','CallVote','callvote_main',\&callvote_main,'callvote\s+(.+?)');
+	Giraf::Trigger::register('public_function','CallVote','callvote_vote',\&callvote_vote,'[fF][12]\s*');
+	Giraf::Trigger::register('on_nick_function','CallVote','callvote_nick',\&callvote_nick);
 }
 
 sub unload {
-	Giraf::Module::unregister('public_function','callvote','callvote_main');
-	Giraf::Module::unregister('public_function','callvote','callvote_vote');
-	Giraf::Module::unregister('on_nick_function','callvote','callvote_nick');
+
+	Giraf::Core::debug("Giraf::Modules::CallVote::unload");
+
+	Giraf::Trigger::unregister('public_function','CallVote','callvote_main');
+	Giraf::Trigger::unregister('public_function','CallVote','callvote_vote');
+	Giraf::Trigger::unregister('on_nick_function','CallVote','callvote_nick');
 	foreach my $d (keys %{$_votes})
 	{
 		delete($_votes->{$d});
@@ -38,7 +44,7 @@ sub callvote_main {
 	my ($nick,$dest,$what)=@_;
 	my @return;
 	
-	Giraf::Core::debug("callvote_main()");
+	Giraf::Core::debug("Giraf::Modules::CallVote::callvote_main()");
 	
 	my ($sub_func,$args);
 	$what=~m/^callvote\s+((.+?)\??)$/;#To remove ending '?' to catch sub funcs
@@ -62,7 +68,7 @@ sub callvote_launch {
 	my @return;
 	$dest=lc $dest;
 	
-	Giraf::Core::debug("callvote_launch($nick,$dest,$what)");
+	Giraf::Core::debug("Giraf::Modules::CallVote::callvote_launch($nick,$dest,$what)");
 	
 	if(! $_votes->{$dest}->{en_cours} )
 	{
@@ -103,7 +109,7 @@ sub callvote_vote {
 	my @return;
 	$dest=lc $dest;
 	
-	Giraf::Core::debug("callvote_vote($nick,$dest,$what)");
+	Giraf::Core::debug("Giraf::Modules::CallVote::callvote_vote($nick,$dest,$what)");
 
 	if($_votes->{$dest}->{en_cours}) 
 	{
@@ -146,6 +152,9 @@ sub callvote_vote {
 
 sub callvote_status {
 	my($nick, $dest, $what)=@_;
+
+	Giraf::Core::debug("Giraf::Modules::CallVote::callvote_status()");
+
 	my @return;
 	$dest=lc $dest;
 	if( $_votes->{$dest}->{en_cours})

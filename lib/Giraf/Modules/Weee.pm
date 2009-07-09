@@ -6,23 +6,29 @@ package Giraf::Modules::Weee;
 use strict;
 use warnings;
 
-use Giraf::Module;
+use Giraf::Trigger;
 
 # Private vars
 our @_ovations=(['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/'], ['\o/','\\\\o','o//'], ['<o/'],['\\o>'],['\o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/ \o/'] );
 
 sub init {
 	my ($kernel,$irc) = @_;
-	Giraf::Module::register('public_parser','weee','bot_weee',\&bot_weee,'(\B[<>/|_\\\]o[/<>|_\\\]\B)|(\B[</|_\\\>]{2}o)|(o[/<>|_\\\]{2}\B)');
+
+	Giraf::Core::debug("Giraf::Modules::Weee::init()");
+
+	Giraf::Trigger::register('public_parser','Weee','bot_weee',\&bot_weee,'(\B[<>/|_\\\]o[/<>|_\\\]\B)|(\B[</|_\\\>]{2}o)|(o[/<>|_\\\]{2}\B)');
 }
 
 sub unload {
-	Giraf::Module::unregister('public_parser','weee','bot_weee');
+
+	Giraf::Core::debug("Giraf::Modules::Weee::unload()");
+
+	Giraf::Trigger::unregister('public_parser','Weee','bot_weee');
 }
 
 sub bot_weee {
 	my($nick, $dest, $what)=@_;
-	Giraf::Core::debug("bot_weee()");
+	Giraf::Core::debug("Giraf::Modules::Weee::bot_weee()");
 	my @return;
 	my $rand=int(rand(scalar(@_ovations)));
 	my $ref=$_ovations[$rand];
