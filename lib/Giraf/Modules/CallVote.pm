@@ -207,7 +207,7 @@ sub vote_update {
 
 	my $delay_id=$_votes->{$dest}->{delay_id};
 	my $now=time();
-	if( ($now - $_votes->{$dest}->{start_ts} ) < 15 )
+	if( (($_votes->{$dest}->{start_ts}+ $_votes->{$dest}->{delay}) - $now ) < 15 )
 	{
 		$kernel->delay_adjust($delay_id,15);
 	}
