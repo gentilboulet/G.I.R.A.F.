@@ -24,13 +24,13 @@ sub init {
 	my ($ker,$irc_session) = @_;
 	$_kernel=$ker;
 	$_kernel->post( $irc_session => join => $_chan );
-	Giraf::Module::register('public_function','harobattle','harobattle_main',\&harobattle_main,'harobattle.*');
+	Giraf::Trigger::register('public_function','harobattle','harobattle_main',\&harobattle_main,'harobattle.*');
 	# Giraf::Module::register('public_function','harobattle','harobattle_vote',\&harobattle_vote,'[fF][12]\s*');
 	# Giraf::Module::register('on_nick_function','harobattle','harobattle_nick',\&harobattle_nick);
 }
  
 sub unload {
-	Giraf::Module::unregister('public_function','harobattle','harobattle_main');
+	Giraf::Trigger::unregister('public_function','harobattle','harobattle_main');
 	# Giraf::Module::unregister('public_function','harobattle','harobattle_vote');
 	# Giraf::Module::unregister('on_nick_function','harobattle','harobattle_nick');
 }
@@ -81,9 +81,9 @@ sub harobattle_caracs {
 	my ($nick, $dest, $sub_func) = @_;
 	my @return;
 
-	Giraf::Core::debug("harobattle_stats : args = \"$args\"");
+	Giraf::Core::debug("harobattle_caracs : args = \"$sub_func\"");
 
-	push(@return, linemaker("http://urltemporairequimarchepas.com"));
+	push(@return, linemaker("http://giraf.gentilboulet.info/harobattle/"));
 
 	return @return;
 }
