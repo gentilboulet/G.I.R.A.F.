@@ -48,15 +48,18 @@ sub harobattle_main {
 
 	switch ($sub_func) {
 		case 'help'     { push(@return, harobattle_help($nick, $dest, $args)); }
-		case 'original' { push(@return, harobattle_launch($nick, $dest, $args)); }
+		case 'original' { push(@return, harobattle_original($nick, $dest, $args)); }
 		case 'stop'     { push(@return, harobattle_stop($nick, $dest, $args)); }
-		else            { harobattle_caracs($nick, $dest, $sub_func); }
+		else            { push(@return, harobattle_caracs($nick, $dest, $sub_func)); }
 	}
+
+	Giraf::Core::debug("harobattle_main : emit");
  
+#	Giraf::Core::emit(@return);
 	return @return;
 }
 
-sub harobattle_launch {
+sub harobattle_original {
 	my ($nick, $dest, $args) = @_;
 	my @return;
 
@@ -84,7 +87,6 @@ sub harobattle_caracs {
 	Giraf::Core::debug("harobattle_caracs : args = \"$sub_func\"");
 
 	push(@return, linemaker("http://giraf.gentilboulet.info/harobattle/"));
-
 	return @return;
 }
 
@@ -487,7 +489,7 @@ sub attaque {
 					$haro2->{points_vie} -= ($haro1->{puissance} - $armure);
 				}
 				else {
-					push(@return, linemaker($chaine." mais ".nom($haro2)." esquive la balle."));
+					push(@return, linemaker($chaine." mais ".nom($haro2)." esquive."));
 				}
 			}
 		}
