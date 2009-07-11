@@ -33,7 +33,7 @@ sub bot_gygax {
   my $total_modif=$modifs->{STR}+$modifs->{DEX}+$modifs->{CON}+$modifs->{INT}+$modifs->{WIS}+$modifs->{CHA};
   my $ligne;
   
-  $ligne={ action=>"MSG",dest=>$dest,msg=>$nick.": STR: ".$stats->{STR}." (".format_modif($modifs->{STR}).") DEX: ".$stats->{DEX}." (".format_modif($modifs->{DEX}).") CON: ".$stats->{CON}." (".format_modif($modifs->{CON}).") INT: ".$stats->{INT}."(".format_modif($modifs->{INT}).") WIS: ".$stats->{WIS}." (".format_modif($modifs->{WIS}).") CHA: ".$stats->{CHA}." (".format_modif($modifs->{CHA}).") - Total: ".$total." (".format_modif($total_modif).")"};
+  $ligne={ action=>"MSG",dest=>$dest,msg=>$nick.": STR: ".$stats->{STR}." (".format_modif($modifs->{STR}).") DEX: ".$stats->{DEX}." (".format_modif($modifs->{DEX}).") CON: ".$stats->{CON}." (".format_modif($modifs->{CON}).") INT: ".$stats->{INT}." (".format_modif($modifs->{INT}).") WIS: ".$stats->{WIS}." (".format_modif($modifs->{WIS}).") CHA: ".$stats->{CHA}." (".format_modif($modifs->{CHA}).") - Total: ".$total." (".format_modif($total_modif).")"};
   push(@return,$ligne);
   return @return;
 }
@@ -48,7 +48,7 @@ sub bot_4d6 {
   my $total_modif=$modifs->{STR}+$modifs->{DEX}+$modifs->{CON}+$modifs->{INT}+$modifs->{WIS}+$modifs->{CHA};
   my $ligne;
 
-  $ligne={ action=>"MSG",dest=>$dest,msg=>$nick.": STR: ".$stats->{STR}." (".format_modif($modifs->{STR}).") DEX: ".$stats->{DEX}." (".format_modif($modifs->{DEX}).") CON: ".$stats->{CON}." (".format_modif($modifs->{CON}).") INT: ".$stats->{INT}."(".format_modif($modifs->{INT}).") WIS: ".$stats->{WIS}." (".format_modif($modifs->{WIS}).") CHA: ".$stats->{CHA}." (".format_modif($modifs->{CHA}).") - Total: ".$total." (".format_modif($total_modif).")"};
+  $ligne={ action=>"MSG",dest=>$dest,msg=>$nick.": STR: ".$stats->{STR}." (".format_modif($modifs->{STR}).") DEX: ".$stats->{DEX}." (".format_modif($modifs->{DEX}).") CON: ".$stats->{CON}." (".format_modif($modifs->{CON}).") INT: ".$stats->{INT}." (".format_modif($modifs->{INT}).") WIS: ".$stats->{WIS}." (".format_modif($modifs->{WIS}).") CHA: ".$stats->{CHA}." (".format_modif($modifs->{CHA}).") - Total: ".$total." (".format_modif($total_modif).")"};
   push(@return,$ligne);
   return @return;
 }
