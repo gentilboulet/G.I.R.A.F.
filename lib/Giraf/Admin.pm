@@ -37,7 +37,6 @@ sub init {
 
 	Giraf::Core::debug("Giraf::Admin::init()");
 	
-	$_tbl_users=$Giraf::User::_tbl_users;
 	$_tbl_chans=$Giraf::Chan::_tbl_chans;
 	$_tbl_modules=$Giraf::Module::_tbl_modules;
 
@@ -48,6 +47,7 @@ sub init {
 	$_dbh->do("COMMIT");
 
 	Giraf::Trigger::register('public_function','core','bot_admin_main',\&bot_admin_main,'admin.*');
+	Giraf::Trigger::register('public_function','core','bot_register',\&bot_register,'register.*');
 	Giraf::Admin::module_authorized_update();
 }
 
@@ -101,16 +101,62 @@ sub bot_admin_main {
 	switch ($sub_func)
 	{
 #		case 'ignore'{       push(@return,bot_ignore_user($nick,$dest,$args)); }
-		case 'enable'		{	push(@return,bot_disable_module(0,$nick,$dest,$args)); }
-		case 'disable'		{	push(@return,bot_disable_module(1,$nick,$dest,$args)); }
-#		case 'promote'      {       push(@return,bot_del_module($nick,$dest,$args)); }  
-#		case 'demote'      {       push(@return,bot_del_module($nick,$dest,$args)); }
+		case 'module'		{	push(@return,bot_admin_module($nick,$dest,$args)); }
+		case 'user'		{	push(@return,bot_admin_user($nick,$dest,$args)); }
 		case 'join'		{	push(@return,bot_join($nick,$dest,$args)); }
 		case 'part'		{	push(@return,bot_part($nick,$dest,$args)); }
 	}
 
 	return @return;
 }
+
+sub bot_admin_module {
+	my ($nick,$dest,$what)=@_;
+
+	Giraf::Core::debug("bot_admin_module($what)");
+
+	my @return;
+	my ($sub_func,$args);
+	$what=~m/^(.+?)(\s+(.+))?$/;
+
+	$sub_func=$1;
+	$args=$3;
+
+	Giraf::Core::debug("admin module : sub_func=$sub_func");
+
+	switch ($sub_func)
+	{
+		case 'enable'           {       push(@return,bot_disable_module(0,$nick,$dest,$args)); }
+		case 'disable'          {       push(@return,bot_disable_module(1,$nick,$dest,$args)); }
+	}
+
+	return @return;
+}
+
+sub bot_admin_user {
+        my ($nick,$dest,$what)=@_;
+
+        Giraf::Core::debug("bot_admin_user");
+
+        my @return;
+        my ($sub_func,$args);
+        $what=~m/^(.+?)(\s+(.+))?$/;
+
+        $sub_func=$1;
+        $args=$3;
+
+        Giraf::Core::debug("admin user : sub_func=$sub_func");
+
+        switch ($sub_func)
+        {
+#                case 'enable'           {       push(@return,bot_disable_user(0,$nick,$dest,$args)); }
+#                case 'disable'          {       push(@return,bot_disable_user(1,$nick,$dest,$args)); }
+		 case 'register'	 {	 push(@return,bot_register_user($nick,$dest)); }
+        }
+
+        return @return;
+}
+
 
 sub bot_disable_module {
 	my ($disabled,$nick,$dest,$what) = @_;
@@ -125,7 +171,7 @@ sub bot_disable_module {
 	$chan=$1;
 	$module_name=$2;
 
-	if(Giraf::Module::is_user_auth($nick,10000) && $module_name ne 'core')
+	if(Giraf::User::is_user_auth($nick,10000) && $module_name ne 'core')
 	{
 		if(Giraf::Module::module_exists($module_name) && Giraf::Chan::known_chan($chan) )
 		{
@@ -163,7 +209,7 @@ sub bot_join {
 	$what=~m/^(#\S+?)$/;
 
 	$chan=$1;
-	if( Giraf::Module::is_user_auth($nick,10000) )
+	if( Giraf::User::is_user_auth($nick,10000) )
 	{
 		Giraf::Chan->join($chan);
 	}
@@ -185,12 +231,29 @@ sub bot_part {
 
 	Giraf::Core::debug("part $chan, $reason");
 
-	if( Giraf::Module::is_user_auth($nick,10000) )
+	if( Giraf::User::is_user_auth($nick,10000) )
 	{
 		Giraf::Chan->part($chan,$reason);
 	}
 	return @return;
 }
+
+sub bot_register_user {
+	my ($nick,$dest) = @_;
+	my @return;
+	my $ligne;
+	if(Giraf::User->user_register($nick))
+	{
+		$ligne={ action =>"MSG",dest=>$dest,msg=>'Utilisateur [c=red]'.Giraf::User::getUUID($nick).'[/c] enregistré !'};
+	}
+	else
+	{
+		$ligne={ action =>"MSG",dest=>$dest,msg=>'Impossible d\'enregistrer [c=red]'.Giraf::User::getUUID($nick).'[/c] !'};
+	}
+	push(@return,$ligne);	
+	return @return;
+}
+
 
 #Admin utility subs
 sub module_authorized {

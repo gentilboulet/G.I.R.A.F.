@@ -58,9 +58,9 @@ sub init {
 	$_dbh = Giraf::Admin::get_dbh();
 	$_dbh->do("BEGIN TRANSACTION");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules (autorun NUMERIC, file TEXT PRIMARY KEY, name TEXT,session NUMERIC, loaded NUMERIC);");
-	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_users (name TEXT PRIMARY KEY, privileges NUMERIC);");
-	$req=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_users(name,privileges) VALUES(?,10000);");
-	$req->execute(Giraf::Config::get('botadmin'));
+#	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_users (name TEXT PRIMARY KEY, privileges NUMERIC);");
+#	$req=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_users(name,privileges) VALUES(?,10000);");
+#	$req->execute(Giraf::Config::get('botadmin'));
 	# Mark all modules as not loaded
 	$_dbh->do("UPDATE $_tbl_modules SET loaded=0");
 	$_dbh->do("COMMIT");
@@ -120,7 +120,7 @@ sub bot_quit {
 	Giraf::Core::debug("bot_quit()");
 
 	my @return;
-	if(is_user_auth($nick,10000))
+	if(Giraf::User::is_user_auth($nick,10000))
 	{
 		my $reason="All your bot are belong to us";
 		if($what=~m/quit (.+)/)
@@ -170,7 +170,7 @@ sub bot_reload_modules
 
 	my @return;
 	my $ligne;
-	if(is_user_auth($nick,10000) )
+	if(Giraf::User::is_user_auth($nick,10000) )
 	{
 		foreach my $file_pm (keys %INC) {
 			if( my ($module_name) = $file_pm =~/^Giraf\/Modules\/(.+)\.pm$/)
@@ -206,7 +206,7 @@ sub bot_load_module {
 
 	Giraf::Core::debug("bot_load_module()");
 
-	if(is_user_auth($nick,10000))
+	if(Giraf::User::is_user_auth($nick,10000))
 	{
 
 		if(module_exists($module_name))
@@ -250,7 +250,7 @@ sub bot_unload_module {
 
 	my @return;
 
-	if(is_user_auth($nick,10000))
+	if(Giraf::User::is_user_auth($nick,10000))
 	{
 		if( module_exists($module_name) )
 		{
@@ -277,7 +277,7 @@ sub bot_add_module {
 
 	my $regex= '(.+)\s+(.+\.pm)\s+([0-9]*)';
 	my @return;
-	if(is_user_auth($nick,10000))
+	if(Giraf::User::is_user_auth($nick,10000))
 	{
 		if( my ($name,$file,$autorun) = $what=~/$regex/ )
 		{
@@ -311,7 +311,7 @@ sub bot_del_module {
 
 	my @return;
 
-	if(is_user_auth($nick,10000))
+	if(Giraf::User::is_user_auth($nick,10000))
 	{
 		if (!$module_name)
 		{
@@ -395,7 +395,7 @@ sub bot_set_module {
 
 	Giraf::Core::debug("bot_set_module()");
 
-	if(is_user_auth($nick,10000))
+	if(Giraf::User::is_user_auth($nick,10000))
 	{
 		Giraf::Core::debug("regex=$regex : what=$what");
 		if( my ($name,$param,$value) = $what=~/^$regex$/ )
@@ -475,17 +475,4 @@ sub module_loaded {
 	return $count;
 }
 
-
-#TEMPORARY while no User module
-sub is_user_auth {
-	my ($username,$level) = @_;
-
-	my $sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_users WHERE name LIKE ? AND privileges >= ?");
-	my $count;
-
-	$sth->bind_columns( \$count);
-	$sth->execute($username,$level);
-	$sth->fetch();
-	return $count;
-}
 1;

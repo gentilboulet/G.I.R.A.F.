@@ -70,6 +70,9 @@ sub run {
 				irc_quit         => "irc_quit",
 				irc_mode	 => "irc_mode",
 				irc_kick	 => "irc_kick",
+				irc_whois	 => "irc_whois",
+				irc_353		 => "irc_353", # NAMES command
+				irc_352		 => "irc_352", # WHO command
 			],
 		],
 		heap => { irc => $irc },
@@ -78,10 +81,12 @@ sub run {
 	$poe_kernel->run();
 }
 
+#irc welcome
 sub irc_001
 {
 	my ( $kernel, $sender ) = @_[ KERNEL, SENDER ];
-	$Giraf::kernel=$kernel;
+	$Giraf::Core::kernel=$kernel;
+	$Giraf::Core::irc=$sender;
 	# Get the component's object at any time by accessing the heap of
 	# the SENDER
 	my $poco_object = $sender->get_heap();
@@ -96,13 +101,13 @@ sub irc_001
 	undef;
 }
 
+#nick already in use
 sub irc_433
 {
 	my ($kernel) = $_[KERNEL];
 	$botname = "Mr_Bobby";
 	$kernel->post( $irc => nick => $botname );
-#	Giraf::Chan->init( $kernel, $irc, $botname );
-	debug($botname);
+	debug("Bot name : $botname");
 	sleep 1;
 }
 
@@ -110,32 +115,26 @@ sub _default
 {
 	my ( $event, $args ) = @_[ ARG0 .. $#_ ];
 
-	if ( $event =~ /^irc_(353)$/ )
-	{
-		irc_names( $_[ARG1] );
-	} else
-	{
 ## Useless warnings
-#		#debug("unhandled $event");
-#
-#		my $arg_number = 0;
-#		my $str;
-#		foreach (@$args)
-#		{
-#			$str = "  ARG$arg_number = ";
-#			if ( ref($_) eq 'ARRAY' )
-#			{
-#				$str .= "$_ = [", join( ", ", @$_ ), "]";
-#			} else
-#			{
-#				$str .= "'$_'";
-#			}
-#
-#			#debug($str);
-#			$arg_number++;
-#		}
-		return 0;    # Don't handle signals.
+#	debug("unhandled $event");
+
+	my $arg_number = 0;
+	my $str;
+	foreach (@$args)
+	{
+		$str = "  ARG$arg_number = ";
+		if ( ref($_) eq 'ARRAY' )
+		{
+			$str .= "$_ = [", join( ", ", @$_ ), "]";
+		} else
+		{
+			$str .= "'$_'";
+		}
+
+#		debug($str);
+		$arg_number++;
 	}
+	return 0;    # Don't handle signals.
 }
 
 sub irc_disconnected
@@ -161,8 +160,8 @@ sub irc_error
 sub irc_join
 {
 	my ( $kernel, $sender, $who, $where ) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
-	my $nick = ( split /!/, $who )[0];
-	#Giraf::Chan->add_user( $where, $nick );
+	my ($nick,$hostmask) = ( split /!/, $who );
+	Giraf::User->add_user_info( $nick,$hostmask );
 	debug("$nick join $where");
 }
 
@@ -184,18 +183,44 @@ sub irc_public
 	undef;
 }
 
-sub irc_names
+#irc_who
+sub irc_352
 {
-	my ($info) = @_;
-	$info = @$info[1];
+	my ($kernel,$sender,$server, $infos) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
+	#giraf ~Liche tiamat.gamerscommunities.com irc.iiens.net Liche H :0 Thien
+	my ($chan,$user,$host,$srv,$nick,$hostmask);
+	$infos=~m/^(\#.+?) (.+?) (.+?) (.+?) (.+?) (.*)$/;
+	$chan=$1;
+	$user=$2;
+	$host=$3;
+	$srv=$4;
+	$nick=$5;
+	$hostmask=$user.'@'.$host;
+	Giraf::User->add_user_info($nick,$hostmask);
+}
+
+#irc_names
+sub irc_353
+{
+	my ($kernel,$sender,$server, $info) = @_[ KERNEL, SENDER, ARG0, ARG1];
 	$info =~ /= (#.*) :(.*) /;
 	my $chan = $1;
 	my @users_list = split( / / , $2 );
-	foreach my $k (@users_list)
+	foreach my $nick (@users_list)
 	{
-		debug( "Sur " . $chan . " il y a {" . $k . "}" );
-		#Giraf::Chan->add_user( $chan, $k );
+		debug( "Sur " . $chan.'@'. $server . " il y a {" . $nick . "}" );
+		$nick=~s/^[^A-Za-z0-9]?(.*)$/$1/g;
 	}
+}
+
+sub irc_whois 
+{
+	my ( $kernel, $sender, $infos ) = @_[ KERNEL, SENDER, ARG0 ];
+	foreach my $k (keys %$infos)
+	{
+		Giraf::Core::debug("WHOIS : $k => ".$infos->{$k});
+	}
+	Giraf::User->add_user_info($infos->{nick},$infos->{user},$infos->{host});
 }
 
 sub irc_nick
@@ -303,6 +328,7 @@ sub _start
 	undef;
 	Giraf::Admin->init( $kernel, $irc);
 	Giraf::Chan->init( $kernel,  $irc ,$botname);
+	Giraf::User->init( $kernel,  $irc ,$botname);
 	Giraf::Trigger->init( $kernel, $irc ,$triggers);
 	Giraf::Module->init( $kernel,  $irc);
 	$kernel->post ($irc_session =>  'privmsg' => nickserv => "IDENTIFY ".Giraf::Config::get('botpass'));
@@ -415,16 +441,16 @@ sub emit
 	{
 		if ( $ligne->{action} eq "ACTION" )
 		{
-			$Giraf::kernel->post( $irc=> 'ctcp' => $ligne->{dest} => "ACTION " . bbcode($ligne->{msg}) );
+			$Giraf::Core::kernel->post( $Giraf::Core::irc=> 'ctcp' => $ligne->{dest} => "ACTION " . bbcode($ligne->{msg}) );
 		} elsif ( $ligne->{action} eq "PRIVMSG" )
 		{
-			$Giraf::kernel->post( $irc=> 'privmsg' => $ligne->{dest} => bbcode($ligne->{msg}) );
+			$Giraf::Core::kernel->post( $Giraf::Core::irc=> 'privmsg' => $ligne->{dest} => bbcode($ligne->{msg}) );
 		} elsif ( $ligne->{action} eq "MSG" )
 		{
-			$Giraf::kernel->post( $irc=> 'privmsg' => $ligne->{dest} => bbcode($ligne->{msg}) );
+			$Giraf::Core::kernel->post( $Giraf::Core::irc=> 'privmsg' => $ligne->{dest} => bbcode($ligne->{msg}) );
 		} elsif ( $ligne->{action} eq "NOTICE" )
 		{
-			$Giraf::kernel->post( $irc=> 'notice' => $ligne->{dest} => bbcode($ligne->{msg}) );
+			$Giraf::Core::kernel->post( $Giraf::Core::irc=> 'notice' => $ligne->{dest} => bbcode($ligne->{msg}) );
 		}
 	}
 }

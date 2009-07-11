@@ -38,6 +38,7 @@ sub join {
 	$sth->execute($chan);
 #	Giraf::Core::debug("Join _irc =$_irc ; _kernel =$_kernel");
 	$_kernel->post( $_irc => join => $chan );
+	$_kernel->post( $_irc => who => $chan );
 }
 
 sub autorejoin {
