@@ -55,7 +55,6 @@ sub harobattle_main {
 
 	Giraf::Core::debug("harobattle_main : emit");
  
-#	Giraf::Core::emit(@return);
 	return @return;
 }
 
@@ -96,9 +95,12 @@ sub harobattle_stop {
 
 	Giraf::Core::debug("harobattle_stop : args = \"$args\"");
 
+	if($_continuer) {
+		push(@return, linemaker("OK, on arrête après le prochain duel."));
+	}
+
 	$_continuer = 0;
 
-	push(@return, linemaker("OK, on arrête après le prochain duel."));
 	return @return;
 }
 
@@ -497,113 +499,6 @@ sub attaque {
 	}
 	return @return;
 }
-
-sub match {
-
-	#####################################################################
-	# Chargement des caractéristiques des deux haros qui vont combattre #
-	#####################################################################
-	$_champion = chargement(2);
-	$_challenger = chargement(5);
-
-	# ouverture des paris
-	$_paris_ouverts=1;
-
-	for (my $i=5; $i>0; $i--) {
-		# print("Le prochain duel va opposer ".nom($_champion)." et ".nom($_challenger)." dans ".$i." minutes\n");
-		#sleep(60);
-	}
-
-	#fermeture des paris
-	$_paris_ouverts=0;
-
-	for (my $i=5; $i>0; $i--) {
-		print($i."\n");
-		#sleep(1);
-	}
-
-	##############
-	# Initiative #
-	##############
-
-	my $initiative = initiative();
-
-	##########
-	# Combat #
-	##########
-
-	combat($initiative);
-}
-
-# match();
-# stats();
-
-sub stats {
-	my $nul = 0;
-	my $nuls = 0;
-	my $statistiques = "Statistiques :";
-
-	my @stats_table = (
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0]
-	);
-
-	for (my $j = 2; $j < 9; $j++) {
-	for (my $k = 1; $k < $j; $k++) {
-
-		for (my $i = 0; $i < 10000; $i++) {
-			$_champion = chargement($k);
-			$_challenger = chargement($j);
-
-			my $stat = combat(initiative());
-
-			if ($stat == 1) {
-				$stats_table[$k-1][$j-1]++;
-				$stats_table[$k-1][8]++;
-				$stats_table[8][$j-1]++;
-			}
-			if ($stat == -1) {
-				$stats_table[$j-1][$k-1]++;
-				$stats_table[$j-1][8]++;
-				$stats_table[8][$k-1]++;
-			}
-			if($stat == 0) {
-				$nuls++;
-				$nul++;
-			}
-		}
-		# $statistiques .= nom($_champion)." vs ".nom($_challenger)." : ".$_champion_win." / ".$_challenger_win;
-		# $statistiques .= ", nuls : ".(10000 - $_champion_win - $_challenger_win)." / 10000 matches\n";
-
-		print("Stats pour ".nom($_champion)." vs ".nom($_challenger)." terminées, nuls : ".int($nul/100)."%\n");
-		$nul = 0;
-	}}
-
-	for (my $j = 0; $j < 9; $j++) {
-		$statistiques .= "\n+";
-		for (my $k = 0; $k < 9; $k++) {
-			$statistiques .= "----+";
-		}
-		$statistiques .= "\n|";
-		for (my $k = 0; $k < 9; $k++) {
-			$statistiques .= " ".int($stats_table[$j][$k] / (100 + (700 * ($k == 8 || $j == 8))))." |";
-		}
-	}
-	$statistiques .= "\n+";
-	for (my $k = 0; $k < 9; $k++) {
-		$statistiques .= "----+";
-	}
-
-	print($statistiques."\n");
-
-	print("Nuls : ".int($nuls / 3400)."%\n");
-}
-
 
 ######## ##     ## ######## ##    ## ########    ##     ##    ###    ##    ## ########  ##       ######## ########   ######  
 ##       ##     ## ##       ###   ##    ##       ##     ##   ## ##   ###   ## ##     ## ##       ##       ##     ## ##    ## 
