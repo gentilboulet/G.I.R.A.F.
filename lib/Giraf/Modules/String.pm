@@ -10,7 +10,7 @@ sub init {
 	my ($kernel,$irc) = @_;
 	Giraf::Trigger::register('public_function','String','bot_reverse',\&bot_reverse,'reverse\s+(.+)');
 	Giraf::Trigger::register('public_function','String','bot_rot13',\&bot_rot13,'rot13\s+(.+)');
-	Giraf::Trigger::register('public_function','String','bot_rot13',\&bot_hex_str,'hex_str\s+(.+)');
+	Giraf::Trigger::register('public_function','String','bot_hex_str',\&bot_hex_str,'hex_str\s+(.+)');
 }
 sub unload {
         my ($kernel,$irc) = @_;
