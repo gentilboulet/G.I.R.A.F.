@@ -4,7 +4,6 @@ package Giraf::Modules::String;
 use strict;
 use warnings;
 use Giraf::Admin;
-use utf8;
 
 sub init {
 	my ($kernel,$irc) = @_;
@@ -24,11 +23,14 @@ sub bot_reverse {
 	my ($nick,$dest,$what) = @_;
 	$what=~m/^reverse\s+(.+)$/;
 	my $str=$1;
+	Giraf::Core::debug(utf8::decode($str));
 	chomp($str);
 	my ($result,$char,$ligne,@return);
 	$result='';
-	while($char = chop($str)) {
+	while(length($str)) {
+		$char = chop($str);
 		$result = $result.$char;
+		Giraf::Core::debug($char);
 	}
 	$ligne = {action=>"MSG",dest=>$dest,msg=>$result};
 	push(@return,$ligne);
