@@ -205,9 +205,8 @@ sub private_msg
 				push(@return,$element->{function}->($nick,$where,$what));
 			}
 		}
-		return @return;
-
 	}
+	return @return;
 }
 
 #Registration sub
