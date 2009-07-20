@@ -20,9 +20,13 @@ our $_botadmin_registered=0;
 
 our $_tbl_users='users';
 our $_tbl_nick_history='nick_history';
+our $_tbl_ignores='ignores';
 
 sub init {
 	my ( $class, $ker, $irc_session) = @_;
+	
+	my ($sth,$uuid);
+
 
 	$_kernel  = $ker;
 	$_irc     = $irc_session;
@@ -32,8 +36,10 @@ sub init {
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_users (nick TEXT UNIQUE, hostmask TEXT, UUID TEXT PRIMARY KEY, privileges NUMERIC DEFAULT 0)");
 	$_dbh->do("DROP TABLE $_tbl_nick_history");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_nick_history (nick TEXT PRIMARY KEY, last_seen NUMERIC, hostmask TEXT, UUID TEXT)");
+	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_ignores (UUID TEXT PRIMARY KEY, permanent NUMERIC)");
+	$_dbh->do("DELETE FROM $_tbl_ignores WHERE permanent = 0");
 	$_dbh->do("COMMIT;");
-
+	
 	Giraf::Trigger::register('on_nick_function','core','bot_on_nick_change',\&bot_on_nick_change);
 
 }
@@ -69,7 +75,6 @@ sub getDataFromNick {
 	{
 		$uuid=$uuid_priv;	
 	}
-	Giraf::Core::debug("getDataFromNick($nick)={uuid=>$uuid,hostmask=>$hostmask}");
 	$return={nick=>$nick,uuid=>$uuid,hostmask=>$hostmask};
 	return $return;
 }
@@ -77,12 +82,22 @@ sub getDataFromNick {
 sub getUUID {
 	my ($nick)=@_;
 	my $info=getDataFromNick($nick);
+	Giraf::Core::debug("getUUID($nick)=".$info->{uuid});	
 	return $info->{uuid};
+}
+
+sub getNickFromUUID {
+	my ($uuid)=@_;
+	my ($sth,$nick);
+	$sth=$_dbh->prepare("SELECT nick FROM $_tbl_nick_history WHERE UUID LIKE ? ORDER BY last_seen DESC");
+	$sth->bind_columns(\$nick);
+	$sth->execute($uuid);
+	$sth->fetch();
+	return $nick;
 }
 
 sub history_add {
 	my ($nick,$hostmask,$UUID) = @_;
-	Giraf::Core::debug("history_add($nick,$hostmask,$UUID)");
 	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_nick_history (nick,last_seen,UUID,hostmask) VALUES (?,?,?,?)");
 	$sth->execute($nick,time(),$UUID,$hostmask);
 	if(!$_botadmin_registered && $nick eq Giraf::Config::get('botadmin'))
@@ -103,7 +118,7 @@ sub user_register {
 	my ($UUID,$sth);
 	my $data=getDataFromNick($nick);
 	$UUID=$nick.'{'.$data->{hostmask}.'}';
-	$sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_users (nick,hostmask,UUID) VALUES (?,?,?)");
+	$sth=$_dbh->prepare("INSERT INTO $_tbl_users (nick,hostmask,UUID) VALUES (?,?,?)");
 	$sth->execute($nick,$data->{hostmask},$data->{uuid});
 	return 1;
 }
@@ -115,6 +130,21 @@ sub user_unregister {
 	$sth=$_dbh->prepare("DELETE FROM $_tbl_users WHERE UUID LIKE ?");
 	$sth->execute($UUID);
 	return 1;
+}
+
+sub user_ignore {
+	my ($class,$nick,$perma) = @_;
+	my ($UUID,$sth);
+	if(!is_user_auth($nick,10000))
+	{
+		$UUID=getUUID($nick);
+		$sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_ignores (uuid,permanent) VALUES (?,?)");
+		return $sth->execute($UUID,$perma);
+	}
+	else
+	{
+		return 0;
+	}
 }
 
 sub is_user_auth {
@@ -132,6 +162,17 @@ sub is_user_auth {
 	$sth->execute($data->{uuid},$level);
 	$sth->fetch();
 	return (($count_nickhost > 0) || ($_botadmin_registered*$count_uuid>0));
+}
+
+sub is_user_ignore {
+	my ($username) = @_;
+	my ($ignore,$uuid,$sth);
+	$uuid=getUUID($username);
+	$sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_ignores WHERE UUID LIKE ?");
+	$sth->bind_columns(\$ignore);
+	$sth->execute($uuid);
+	$sth->fetch();
+	return $ignore;
 }
 
 sub DESTROY {
