@@ -371,6 +371,7 @@ sub bbcode
 		jaune       => "08",
 		vert_clair  => "09",
 		bleu_vert   => "10",
+		cyan	    => "10",
 		bleu_clair  => "11",
 		bleu        => "12",
 		bleu_royal  => "12",
