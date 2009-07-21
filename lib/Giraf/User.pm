@@ -23,7 +23,7 @@ our $_tbl_nick_history='nick_history';
 our $_tbl_ignores='ignores';
 
 sub init {
-	my ( $class, $ker, $irc_session) = @_;
+	my ( $ker, $irc_session) = @_;
 	
 	my ($sth,$uuid);
 
@@ -53,7 +53,7 @@ sub bot_on_nick_change {
 }
 
 sub add_user_info {
-	my ($class, $nick,$hostmask) = @_;
+	my ( $nick,$hostmask) = @_;
 	Giraf::Core::debug("add_user_info($nick,$hostmask)");
 	my $UUID=$nick.'{'.$hostmask.'}';
 	history_add($nick,$hostmask,$UUID);
@@ -114,7 +114,7 @@ sub register_botadmin {
 }
 
 sub user_register {
-	my ($class,$nick) = @_;
+	my ($nick) = @_;
 	my ($UUID,$sth);
 	my $data=getDataFromNick($nick);
 	$UUID=$nick.'{'.$data->{hostmask}.'}';
@@ -124,7 +124,7 @@ sub user_register {
 }
 
 sub user_unregister {
-	my ($class,$nick) = @_;
+	my ($nick) = @_;
 	my ($UUID,$sth);
 	$UUID=getUUID($nick);
 	$sth=$_dbh->prepare("DELETE FROM $_tbl_users WHERE UUID LIKE ?");
@@ -133,7 +133,7 @@ sub user_unregister {
 }
 
 sub user_ignore {
-	my ($class,$nick,$perma) = @_;
+	my ($nick,$perma) = @_;
 	my ($UUID,$sth);
 	if(!is_user_auth($nick,10000))
 	{

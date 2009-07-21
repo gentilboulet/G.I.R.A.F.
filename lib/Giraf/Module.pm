@@ -46,7 +46,7 @@ sub mod_mark_loaded {
 }
 
 sub init {
-	my ( $classe, $ker, $irc_session ) = @_;
+	my ( $ker, $irc_session ) = @_;
 	$_kernel  = $ker;
 	$_irc     = $irc_session;
 
@@ -58,9 +58,6 @@ sub init {
 	$_dbh = Giraf::Admin::get_dbh();
 	$_dbh->do("BEGIN TRANSACTION");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules (autorun NUMERIC, file TEXT PRIMARY KEY, name TEXT,session NUMERIC, loaded NUMERIC);");
-#	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_users (name TEXT PRIMARY KEY, privileges NUMERIC);");
-#	$req=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_users(name,privileges) VALUES(?,10000);");
-#	$req->execute(Giraf::Config::get('botadmin'));
 	# Mark all modules as not loaded
 	$_dbh->do("UPDATE $_tbl_modules SET loaded=0");
 	$_dbh->do("COMMIT");
@@ -127,7 +124,7 @@ sub bot_quit {
 		{
 			$reason=$1;
 		}
-		Giraf::Trigger->on_bot_quit($reason);
+		Giraf::Trigger::on_bot_quit($reason);
 	}
 	return @return
 }
@@ -397,7 +394,6 @@ sub bot_set_module {
 
 	if(Giraf::User::is_user_auth($nick,10000))
 	{
-		Giraf::Core::debug("regex=$regex : what=$what");
 		if( my ($name,$param,$value) = $what=~/^$regex$/ )
 		{
 			my $tbl_param;

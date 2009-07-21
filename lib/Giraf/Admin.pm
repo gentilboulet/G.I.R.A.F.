@@ -30,7 +30,7 @@ our $_tbl_modules;
 our $_auth_modules;
 
 sub init {
-	my ( $classe, $ker, $irc_session, $botname) = @_;
+	my ( $ker, $irc_session, $botname) = @_;
 	$_kernel  = $ker;
 	$_irc     = $irc_session;
 	$_botname = $botname;
@@ -100,7 +100,6 @@ sub bot_admin_main {
 
 	switch ($sub_func)
 	{
-#		case 'ignore'{       push(@return,bot_ignore_user($nick,$dest,$args)); }
 		case 'module'		{	push(@return,bot_admin_module($nick,$dest,$args)); }
 		case 'user'		{	push(@return,bot_admin_user($nick,$dest,$args)); }
 		case 'join'		{	push(@return,bot_join($nick,$dest,$args)); }
@@ -145,16 +144,15 @@ sub bot_admin_user {
         $sub_func=$1;
         $args=$3;
 
-        Giraf::Core::debug("admin user : sub_func=$sub_func");
+	Giraf::Core::debug("admin user : sub_func=$sub_func");
 
-        switch ($sub_func)
-        {
-#                case 'enable'           {       push(@return,bot_disable_user(0,$nick,$dest,$args)); }
-#                case 'disable'          {       push(@return,bot_disable_user(1,$nick,$dest,$args)); }
-		 case 'register'	 {	 push(@return,bot_register_user($nick,$dest)); }
-        }
+	switch ($sub_func)
+	{
+		case 'register'	{	 push(@return,bot_register_user($nick,$dest)); 		}
+		case 'ignore'	{       push(@return,bot_ignore_user($nick,$dest,$args)); 	}
+	}
 
-        return @return;
+	return @return;
 }
 
 
@@ -194,12 +192,12 @@ sub bot_disable_module {
 			$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] inconnu ou [c=green]'.$chan.'[/c] inconnu !'};
 		}
 		push (@return,$ligne);
-	}
-	return @return;
-}
+	 }
+	 return @return;
+ }
 
-sub bot_join {
-	my ($nick,$dest,$what) = @_;
+ sub bot_join {
+	 my ($nick,$dest,$what) = @_;
 
 	Giraf::Core::debug("bot_join");
 
@@ -211,7 +209,7 @@ sub bot_join {
 	$chan=$1;
 	if( Giraf::User::is_user_auth($nick,10000) )
 	{
-		Giraf::Chan->join($chan);
+		Giraf::Chan::join($chan);
 	}
 	return @return;
 }
@@ -233,7 +231,7 @@ sub bot_part {
 
 	if( Giraf::User::is_user_auth($nick,10000) )
 	{
-		Giraf::Chan->part($chan,$reason);
+		Giraf::Chan::part($chan,$reason);
 	}
 	return @return;
 }
@@ -242,7 +240,7 @@ sub bot_register_user {
 	my ($nick,$dest) = @_;
 	my @return;
 	my $ligne;
-	if(Giraf::User->user_register($nick))
+	if(Giraf::User::user_register($nick))
 	{
 		$ligne={ action =>"MSG",dest=>$dest,msg=>'Utilisateur [c=red]'.Giraf::User::getUUID($nick).'[/c] enregistré !'};
 	}
@@ -251,6 +249,37 @@ sub bot_register_user {
 		$ligne={ action =>"MSG",dest=>$dest,msg=>'Impossible d\'enregistrer [c=red]'.Giraf::User::getUUID($nick).'[/c] !'};
 	}
 	push(@return,$ligne);	
+	return @return;
+}
+
+sub bot_ignore_user {
+	my ($nick,$dest,$args) = @_;
+	my @return;
+	my $ligne;
+	$args=~m/^(.+?)\s*(1)?$/;
+	my ($who,$permanent);
+	$who=$1;
+	if(!$2)
+	{
+		$permanent=0;
+	}
+	else
+	{
+		$permanent=1;
+	}
+	Giraf::Core::debug("bot_ignore_user who=$who, perma=$permanent");
+	if(Giraf::User::is_user_auth($nick,10000) )
+	{
+		if(Giraf::User::user_ignore($who,$permanent))
+		{
+			$ligne={action => "MSG",dest=>$dest,msg=>"Utilisateur [c=red]".$who."[/c] ignoré ! (permanent=$permanent)"};
+		}
+		else
+		{
+			$ligne={ action =>"MSG",dest=>$dest,msg=>"Impossible d\'ignorer [c=red]".$who."[/c] !"};
+		}
+		push(@return,$ligne);
+	}
 	return @return;
 }
 

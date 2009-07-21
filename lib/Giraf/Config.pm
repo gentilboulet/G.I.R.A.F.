@@ -29,8 +29,14 @@ sub load {
 
 sub get {
 	my ($name) = @_;
-
-	return $config{$name};
+	if($config{$name})
+	{
+		return $config{$name};
+	}
+	else
+	{
+		return "";
+	}
 }
 
 sub set {

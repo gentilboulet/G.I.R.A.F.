@@ -18,7 +18,7 @@ our $_irc;
 our $_tbl_chans='chans';
 
 sub init {
-	my ( $class, $ker, $irc_session) = @_;
+	my ( $ker, $irc_session) = @_;
 
 	$_kernel  = $ker;
 	$_irc     = $irc_session;
@@ -32,7 +32,7 @@ sub init {
 }
 
 sub join {
-	my ( $class, $chan ) = @_;
+	my ( $chan ) = @_;
 	Giraf::Core::debug("Chan->join($chan)");
 	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_chans (name,joined) VALUES (?,1)");	
 	$sth->execute($chan);
@@ -42,14 +42,14 @@ sub join {
 }
 
 sub autorejoin {
-	my ( $class, $chan, $autorejoin ) = @_;
+	my ( $chan, $autorejoin ) = @_;
 	my $sth=$_dbh->prepare("UPDATE $_tbl_chans SET autorejoin=? WHERE name LIKE ?");
 	$sth->execute($autorejoin,$chan);
 
 }
 
 sub part {
-	my ( $class, $chan, $reason) = @_;
+	my ( $chan, $reason) = @_;
 #	Giraf::Core::debug("Chan->part($chan,$reason)");
 	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_chans (name,joined) VALUES (?,0)");
 	$sth->execute($chan);
