@@ -61,19 +61,23 @@ sub add_user_info {
 
 sub getDataFromNick {
 	my ($nick)=@_;
-	my ($sth,$return,$uuid,$hostmask,$uuid_priv);
+	my ($sth,$return,$uuid,$hostmask,$uuid_with_privileges);
 	$sth=$_dbh->prepare("SELECT hostmask,UUID FROM $_tbl_nick_history WHERE nick LIKE ? ORDER BY last_seen DESC");
 	$sth->bind_columns(\$hostmask,\$uuid);
 	$sth->execute($nick);
 	$sth->fetch();
 
 	$sth=$_dbh->prepare("SELECT UUID FROM $_tbl_users WHERE nick LIKE ? AND hostmask LIKE ?");
-	$sth->bind_columns(\$uuid_priv);
+	$sth->bind_columns(\$uuid_with_privileges);
 	$sth->execute($nick,$hostmask);
 	$sth->fetch();
-	if($uuid_priv)
+	if($uuid_with_privileges)
 	{
-		$uuid=$uuid_priv;	
+		if($uuid ne $uuid_with_privileges)
+		{
+			Giraf::Core::emit(Giraf::Trigger::on_uuid_change($uuid,$uuid_with_privileges));
+		}
+		$uuid=$uuid_with_privileges;	
 	}
 	$return={nick=>$nick,uuid=>$uuid,hostmask=>$hostmask};
 	return $return;
