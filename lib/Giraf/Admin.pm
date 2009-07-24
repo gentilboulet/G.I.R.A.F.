@@ -148,8 +148,9 @@ sub bot_admin_user {
 
 	switch ($sub_func)
 	{
-		case 'register'	{	 push(@return,bot_register_user($nick,$dest)); 		}
+		case 'register'	{	push(@return,bot_register_user($nick,$dest)); 		}
 		case 'ignore'	{       push(@return,bot_ignore_user($nick,$dest,$args)); 	}
+		case 'unignore'	{       push(@return,bot_unignore_user($nick,$dest,$args)); 	}
 	}
 
 	return @return;
@@ -281,6 +282,24 @@ sub bot_ignore_user {
 		push(@return,$ligne);
 	}
 	return @return;
+}
+
+sub bot_unignore_user {
+        my ($nick,$dest,$args) = @_;
+        my @return;
+        my $ligne;
+        $args=~m/^(.+?)\s*$/;
+        my ($who);
+        Giraf::Core::debug("bot_unignore_user who=$who");
+        if(Giraf::User::is_user_auth($nick,10000) )
+        {
+                if(Giraf::User::user_unignore($who))
+                {
+                        $ligne={action => "MSG",dest=>$dest,msg=>"Utilisateur [c=red]".$who."[/c] unignoré !"};
+                }
+                push(@return,$ligne);
+        }
+        return @return;
 }
 
 

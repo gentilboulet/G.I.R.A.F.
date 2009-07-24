@@ -151,6 +151,14 @@ sub user_ignore {
 	}
 }
 
+sub user_unignore {
+	my ($nick) = @_;
+	my ($UUID,$sth);
+	$UUID=getUUID($nick);
+	$sth=$_dbh->prepare("DELETE FROM $_tbl_ignores WHERE uuid LIKE ?");
+	return $sth->execute($UUID);
+}
+
 sub is_user_auth {
         my ($username,$level) = @_;
 	my $data=getDataFromNick($username);
