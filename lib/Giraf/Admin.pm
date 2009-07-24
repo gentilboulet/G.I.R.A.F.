@@ -289,7 +289,7 @@ sub bot_unignore_user {
         my @return;
         my $ligne;
         $args=~m/^(.+?)\s*$/;
-        my ($who);
+        my ($who)=($1);
         Giraf::Core::debug("bot_unignore_user who=$who");
         if(Giraf::User::is_user_auth($nick,10000) )
         {
