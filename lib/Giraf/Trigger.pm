@@ -28,6 +28,7 @@ our $_on_uuid_change_functions;
 our $_on_join_functions;
 our $_on_part_functions;
 our $_on_quit_functions;
+our $_on_kick_functions;
 our $_public_parsers;
 our $_private_parsers;
 
@@ -48,9 +49,9 @@ sub on_part {
 	Giraf::Core::debug("Giraf::Trigger::on_part($nick,$channel)");
 
 	my @return;
-	foreach my $key (keys %$_on_part_functions)
+	foreach my $module_name (keys %$_on_part_functions)
 	{
-		my $module=$_on_part_functions->{$key};
+		my $module=$_on_part_functions->{$module_name};
 		foreach my $func (keys %$module)
 		{
 			push(@return,$module->{$func}->{function}->($nick,$channel));
@@ -65,9 +66,9 @@ sub on_quit {
 	Giraf::Core::debug("Giraf::Trigger::on_quit($nick,$message)");
 
 	my @return;
-	foreach my $key (keys %$_on_quit_functions)
+	foreach my $module_name (keys %$_on_quit_functions)
 	{
-		my $module=$_on_quit_functions->{$key};
+		my $module=$_on_quit_functions->{$module_name};
 		foreach my $func (keys %$module)
 		{
 			push(@return,$module->{$func}->{function}->($nick,$message));
@@ -82,9 +83,9 @@ sub on_nick {
 	Giraf::Core::debug("Giraf::Trigger::on_nick($nick,$nick_new)");
 
 	my @return;
-	foreach my $key (keys %$_on_nick_functions)
+	foreach my $module_name (keys %$_on_nick_functions)
 	{
-		my $module=$_on_nick_functions->{$key};
+		my $module=$_on_nick_functions->{$module_name};
 		foreach my $func (keys %$module)
 		{
 			push(@return,$module->{$func}->{function}->($nick,$nick_new));
@@ -94,22 +95,46 @@ sub on_nick {
 	return @return;
 }
 
+sub on_kick {
+        my ( $kicked, $channel, $kicker, $reason ) = @_;
+
+        Giraf::Core::debug("Giraf::Trigger::on_kick($kicked, $channel, $kicker, $reason)");
+
+        my @return;
+        foreach my $module_name (keys %$_on_kick_functions)
+	{
+		my $module=$_on_kick_functions->{$module_name};
+		if( Giraf::Admin::module_authorized($module_name,$channel) )
+		{
+			foreach my $func (keys %$module)
+			{
+				push(@return,$module->{$func}->{function}->($kicked,$channel,$kicker,$reason));
+
+			}
+		}
+	}
+
+
+	return @return;
+}
+
+
 sub on_uuid_change {
-        my ( $uuid, $uuid_new ) = @_;
+	my ( $uuid, $uuid_new ) = @_;
 
 	Giraf::Core::debug("Giraf::Trigger::on_uuid_change($uuid,$uuid_new)");
 
-        my @return;
-        foreach my $key (keys %$_on_uuid_change_functions)
-        {
-                my $module=$_on_uuid_change_functions->{$key};
-                foreach my $func (keys %$module)
-                {
-                        push(@return,$module->{$func}->{function}->($uuid,$uuid_new));
+	my @return;
+	foreach my $module_name (keys %$_on_uuid_change_functions)
+	{
+		my $module=$_on_uuid_change_functions->{$module_name};
+		foreach my $func (keys %$module)
+		{
+			push(@return,$module->{$func}->{function}->($uuid,$uuid_new));
 
-                }
-        }
-        return @return;
+		}
+	}
+	return @return;
 }
 
 
@@ -119,12 +144,15 @@ sub on_join {
 	Giraf::Core::debug("Giraf::Trigger::on_join($nick,$channel)");
 
 	my @return;
-	foreach my $key (keys %$_on_join_functions)
+	foreach my $module_name (keys %$_on_join_functions)
 	{
-		my $module=$_on_join_functions->{$key};
-		foreach my $func (keys %$module)
+		my $module=$_on_join_functions->{$module_name};
+		if( Giraf::Admin::module_authorized($module_name,$channel))
 		{
-			push(@return,$module->{$func}->{function}->($nick,$channel));
+			foreach my $func (keys %$module)
+			{
+				push(@return,$module->{$func}->{function}->($nick,$channel));
+			}
 		}
 	}
 
@@ -251,6 +279,7 @@ sub register {
 			case 'public_function' 		{	$_public_functions->{$module_name}->{$function_name}={function=>$function,regex=>$regex};	}
 			case 'public_parser' 		{	$_public_parsers->{$module_name}->{$function_name}={function=>$function,regex=>$regex};		}
 			case 'on_nick_function' 	{	$_on_nick_functions->{$module_name}->{$function_name}={function=>\&$function};			}
+			case 'on_kick_function' 	{	$_on_kick_functions->{$module_name}->{$function_name}={function=>\&$function};			}
 			case 'on_uuid_change_function' 	{	$_on_uuid_change_functions->{$module_name}->{$function_name}={function=>\&$function};			}
 			case 'on_join_function' 	{	$_on_join_functions->{$module_name}->{$function_name}={function=>\&$function};			}
 			case 'on_part_function' 	{	$_on_part_functions->{$module_name}->{$function_name}={function=>\&$function};			}
@@ -274,6 +303,7 @@ sub unregister {
 			case 'public_function'  	{	delete($_public_functions->{$module_name}->{$function_name});	}
 			case 'public_parser'    	{	delete($_public_parsers->{$module_name}->{$function_name});	}
 			case 'on_nick_function' 	{	delete($_on_nick_functions->{$module_name}->{$function_name});}
+			case 'on_kick_function' 	{	delete($_on_kick_functions->{$module_name}->{$function_name});}
 			case 'on_uuid_change_function' 	{	delete($_on_uuid_change_functions->{$module_name}->{$function_name});}
 			case 'on_join_function' 	{	delete($_on_join_functions->{$module_name}->{$function_name}); }
 			case 'on_part_function' 	{	delete($_on_part_functions->{$module_name}->{$function_name}); }
