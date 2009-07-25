@@ -84,6 +84,9 @@ sub get_param {
 }
 
 sub get_dbh {
+
+	Giraf::Core::debug("Giraf::Admin::get_dbh()");
+
 	if( !$_dbh )
 	{
 		$_dbh=DBI->connect(Giraf::Config::get('dbsrc'), Giraf::Config::get('dbuser'), Giraf::Config::get('dbpass'));
@@ -95,7 +98,7 @@ sub get_dbh {
 sub bot_admin_main {
 	my ($nick,$dest,$what)=@_;
 
-	Giraf::Core::debug("bot_admin_main");
+	Giraf::Core::debug("Giraf::Admin::bot_admin_main()");
 
 	my @return;
 	my ($sub_func,$args);
@@ -120,7 +123,7 @@ sub bot_admin_main {
 sub bot_admin_module {
 	my ($nick,$dest,$what)=@_;
 
-	Giraf::Core::debug("bot_admin_module($what)");
+	Giraf::Core::debug("Giraf::Admin::bot_admin_module($what)");
 
 	my @return;
 	my ($sub_func,$args);
@@ -143,7 +146,7 @@ sub bot_admin_module {
 sub bot_admin_user {
         my ($nick,$dest,$what)=@_;
 
-        Giraf::Core::debug("bot_admin_user");
+        Giraf::Core::debug("Giraf::Admin::bot_admin_user()");
 
         my @return;
         my ($sub_func,$args);
@@ -168,7 +171,7 @@ sub bot_admin_user {
 sub bot_disable_module {
 	my ($disabled,$nick,$dest,$what) = @_;
 
-	Giraf::Core::debug("bot_disable_module");
+	Giraf::Core::debug("Giraf::Admin::bot_disable_module()");
 
 	my @return;
 	my ($ligne,$chan,$module_name);
@@ -178,7 +181,7 @@ sub bot_disable_module {
 	$chan=$1;
 	$module_name=$2;
 
-	if(Giraf::User::is_user_auth($nick,10000) && $module_name ne 'core')
+	if(Giraf::Admin::is_user_chan_admin($nick,$chan) && $module_name ne 'core')
 	{
 		if(Giraf::Module::module_exists($module_name) && Giraf::Chan::known_chan($chan) )
 		{
@@ -208,7 +211,7 @@ sub bot_disable_module {
  sub bot_join {
 	 my ($nick,$dest,$what) = @_;
 
-	Giraf::Core::debug("bot_join");
+	Giraf::Core::debug("Giraf::Admin::bot_join()");
 
 	my @return;
 	my ($chan,$reason);
@@ -216,7 +219,7 @@ sub bot_disable_module {
 	$what=~m/^(#\S+?)$/;
 
 	$chan=$1;
-	if( Giraf::User::is_user_auth($nick,10000) )
+	if( Giraf::Admin::is_user_admin($nick) )
 	{
 		Giraf::Chan::join($chan);
 	}
@@ -226,7 +229,7 @@ sub bot_disable_module {
 sub bot_part {
 	my ($nick,$dest,$what) = @_;
 
-	Giraf::Core::debug("bot_part");
+	Giraf::Core::debug("Giraf::Admin::bot_part()");
 
 	my @return;
 	my ($chan,$reason);
@@ -238,7 +241,7 @@ sub bot_part {
 
 	Giraf::Core::debug("part $chan, $reason");
 
-	if( Giraf::User::is_user_auth($nick,10000) )
+	if( Giraf::Admin::is_user_admin($nick) )
 	{
 		Giraf::Chan::part($chan,$reason);
 	}
@@ -247,6 +250,9 @@ sub bot_part {
 
 sub bot_register_user {
 	my ($nick,$dest) = @_;
+
+	Giraf::Core::debug("Giraf::Admin::bot_register_user($nick)");
+
 	my @return;
 	my $ligne;
 	if(Giraf::User::user_register($nick))
@@ -263,6 +269,9 @@ sub bot_register_user {
 
 sub bot_ignore_user {
 	my ($nick,$dest,$args) = @_;
+
+	Giraf::Core::debug("Giraf::Admin::bot_ignore_user()");
+
 	my @return;
 	my $ligne;
 	$args=~m/^(.+?)\s*(1)?$/;
@@ -277,7 +286,7 @@ sub bot_ignore_user {
 		$permanent=1;
 	}
 	Giraf::Core::debug("bot_ignore_user who=$who, perma=$permanent");
-	if(Giraf::User::is_user_auth($nick,10000) )
+	if(Giraf::Admin::is_user_admin($nick) )
 	{
 		if(Giraf::User::user_ignore($who,$permanent))
 		{
@@ -294,14 +303,17 @@ sub bot_ignore_user {
 
 sub bot_unignore_user {
         my ($nick,$dest,$args) = @_;
+
+	Giraf::Core::debug("Giraf::Admin::bot_unignore_user()");
+
         my @return;
         my $ligne;
         $args=~m/^(.+?)\s*$/;
         my ($who)=($1);
         Giraf::Core::debug("bot_unignore_user who=$who");
-        if(Giraf::User::is_user_auth($nick,10000) )
+        if( Giraf::Admin::is_user_admin($nick) )
         {
-                if(Giraf::User::user_unignore($who))
+                if( Giraf::User::user_unignore($who) )
                 {
                         $ligne={action => "MSG",dest=>$dest,msg=>"Utilisateur [c=red]".$who."[/c] unignoré !"};
                 }
@@ -311,9 +323,48 @@ sub bot_unignore_user {
 }
 
 
+#Admin user management subs
+sub is_user_botadmin {
+	my ($user) = @_;
+	Giraf::Core::debug("Giraf::Admin::is_user_botadmin($user)");
+	return Giraf::User::is_user_botadmin($user);
+}
+
+sub is_user_admin {
+	my ($user) = @_;
+	Giraf::Core::debug("Giraf::Admin::is_user_admin($user)");
+	return Giraf::User::is_user_admin($user);
+}
+
+sub is_user_chan_admin {
+	my ($user,$chan) = @_;
+	Giraf::Core::debug("Giraf::Admin::is_user_chan_admin($user,$chan)");
+	my ($uuid,$sth,$count);
+	if(is_user_admin($user))
+	{
+		return 1;
+	}
+	else
+	{
+		$uuid=Giraf::User::getUUID($user);
+		$sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_chan_admin WHERE chan_name LIKE ? AND user_UUID LIKE ?"); 
+		$sth->bind_columns(\$count);
+		$sth->execute($chan,$uuid);
+		$sth->fetch();
+		return $count;
+	}
+}
+
+sub is_user_registered {
+	my ($user) = @_;
+	Giraf::Core::debug("Giraf::Admin::is_user_registered");
+	return Giraf::User::is_user_registered($user);
+}
+
 #Admin utility subs
 sub module_authorized {
 	my ($module_name,$chan) = @_;
+	Giraf::Core::debug("Giraf::Admin::module_authorized($module_name @ $chan)");
 	return (!$_auth_modules->{$chan}->{$module_name}->{disabled});
 }
 
@@ -333,24 +384,34 @@ sub module_authorized_update {
 	}
 }
 
+
+
+#Admin user tracking subs
 sub add_user_in_chan {
 	my ($uuid,$chan) = @_;
-	Giraf::Core::debug("add_user_in_chan($uuid,$chan)");
+	Giraf::Core::debug("Giraf::Admin::add_user_in_chan($uuid,$chan)");
 	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_users_in_chan (user_UUID,chan_name) VALUES (?,?)");
 	return $sth->execute($uuid,$chan);
 }
 
 sub del_user_in_chan {
 	my ($uuid,$chan) = @_;
-	Giraf::Core::debug("del_user_in_chan($uuid,$chan)");
+	Giraf::Core::debug("Giraf::Admin::del_user_in_chan($uuid,$chan)");
 	my $sth=$_dbh->prepare("DELETE FROM $_tbl_users_in_chan WHERE user_UUID LIKE ? AND chan_name LIKE ?");
 	return $sth->execute($uuid,$chan);
 }
 
 sub del_user_in_all_chan {
 	my ($uuid) = @_;
-	Giraf::Core::debug("del_user_in_all_chan($uuid)");
+	Giraf::Core::debug("Giraf::Admin::del_user_in_all_chan($uuid)");
 	my $sth=$_dbh->prepare("DELETE FROM $_tbl_users_in_chan WHERE user_UUID LIKE ?");
 	return $sth->execute($uuid);
 }
+
+sub user_unregister {
+	my ($uuid) = @_;
+	my $sth=$_dbh->prepare("DELETE FROM $_tbl_chan_admin WHERE user_UUID LIKE ?");
+	return $sth->execute($uuid);
+}
+
 1;

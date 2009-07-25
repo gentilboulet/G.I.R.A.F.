@@ -257,7 +257,7 @@ sub irc_quit
 	debug("$nick quit : $message");
 	my $uuid=Giraf::User::getUUID($nick);
 	Giraf::Admin::del_user_in_all_chan($uuid);
-	emit(Giraf::Trigger::on_quit( $who ) );
+	emit(Giraf::Trigger::on_quit( $who , $message) );
 }
 
 sub irc_kick

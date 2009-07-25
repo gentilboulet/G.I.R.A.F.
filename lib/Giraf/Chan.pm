@@ -23,6 +23,8 @@ sub init {
 	$_kernel  = $ker;
 	$_irc     = $irc_session;
 
+	Giraf::Core::debug("Giraf::Chan::init()");
+
 	$_dbh=Giraf::Admin::get_dbh();
 	$_dbh->do("BEGIN TRANSACTION;");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_chans (name TEXT PRIMARY KEY, autorejoin NUMERIC DEFAULT 0, joined NUMERIC)");
@@ -41,9 +43,11 @@ sub init {
 
 sub join {
 	my ( $chan ) = @_;
+
+	Giraf::Core::debug("Giraf::Chan::join($chan)");
+
 	if(!is_chan_joined($chan))
 	{
-		Giraf::Core::debug("Chan::join($chan)");
 		my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_chans (name,joined) VALUES (?,1)");	
 		$sth->execute($chan);
 		$_kernel->post( $_irc => join => $chan );
@@ -53,6 +57,7 @@ sub join {
 
 sub autorejoin {
 	my ( $chan, $autorejoin ) = @_;
+	Giraf::Core::debug("Giraf::Chan::autorejoin($chan,$autorejoin)");
 	my $sth=$_dbh->prepare("UPDATE $_tbl_chans SET autorejoin=? WHERE name LIKE ?");
 	$sth->execute($autorejoin,$chan);
 
@@ -60,7 +65,7 @@ sub autorejoin {
 
 sub part {
 	my ( $chan, $reason) = @_;
-	Giraf::Core::debug("Chan->part($chan,$reason)");
+	Giraf::Core::debug("Giraf::Chan::part($chan,$reason)");
 	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_chans (name,joined) VALUES (?,0)");
 	$sth->execute($chan);
 	Giraf::Core::debug("Part _irc =$_irc ; _kernel =$_kernel");
@@ -69,6 +74,7 @@ sub part {
 
 sub known_chan {
 	my ($chan) = @_;
+	Giraf::Core::debug("Giraf::Chan::known_chan($chan)");
 	my ($count,$sth);
 	$sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_chans WHERE name LIKE ?");
 	$sth->bind_columns(\$count);
@@ -79,6 +85,7 @@ sub known_chan {
 
 sub is_chan_joined {
 	my ($chan) = @_;
+	Giraf::Core::debug("Giraf::Chan::is_chan_joined($chan)");
 	my ($joined,$sth);
 	$sth=$_dbh->prepare("SELECT joined FROM $_tbl_chans WHERE name LIKE ?");
 	$sth->bind_columns(\$joined);

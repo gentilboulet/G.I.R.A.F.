@@ -44,6 +44,9 @@ sub init {
 #On event subroutines
 sub on_part {
 	my ( $nick, $channel ) = @_;
+
+	Giraf::Core::debug("Giraf::Trigger::on_part($nick,$channel)");
+
 	my @return;
 	foreach my $key (keys %$_on_part_functions)
 	{
@@ -58,7 +61,10 @@ sub on_part {
 }
 
 sub on_quit {
-	my ( $nick) = @_;
+	my ( $nick, $message) = @_;
+
+	Giraf::Core::debug("Giraf::Trigger::on_quit($nick,$message)");
+
 	my @return;
 	foreach my $key (keys %$_on_quit_functions)
 	{
@@ -67,7 +73,7 @@ sub on_quit {
 		{
 			my $element = $module->{$func};
 
-			push(@return,$element->{function}->($nick));
+			push(@return,$element->{function}->($nick,$message));
 		}
 	}
 	return @return;
@@ -75,6 +81,9 @@ sub on_quit {
 
 sub on_nick {
 	my ( $nick, $nick_new ) = @_;
+
+	Giraf::Core::debug("Giraf::Trigger::on_nick($nick,$nick_new)");
+
 	my @return;
 	foreach my $key (keys %$_on_nick_functions)
 	{
@@ -91,6 +100,9 @@ sub on_nick {
 
 sub on_uuid_change {
         my ( $uuid, $uuid_new ) = @_;
+
+	Giraf::Core::debug("Giraf::Trigger::on_uuid_change($uuid,$uuid_new)");
+
         my @return;
         foreach my $key (keys %$_on_uuid_change_functions)
         {
@@ -108,6 +120,9 @@ sub on_uuid_change {
 
 sub on_join {
 	my ( $nick, $channel ) = @_;
+
+	Giraf::Core::debug("Giraf::Trigger::on_join($nick,$channel)");
+
 	my @return;
 	foreach my $key (keys %$_on_join_functions)
 	{
@@ -128,7 +143,8 @@ sub on_bot_quit {
 	my ($module,$module_name,$sth);
 
 	Giraf::Core::set_quit();
-	Giraf::Core::debug("on_bot_quit($reason)");
+
+	Giraf::Core::debug("Giraf::Trigger::on_bot_quit($reason)");
 
 	Giraf::Module::modules_on_quit();
 
@@ -191,6 +207,9 @@ sub public_msg
 sub private_msg
 {
 	my ( $nick, $who, $where, $what )=@_;
+
+	Giraf::Core::debug("Giraf::Trigger::private_msg($who,$what)");
+
 	my @return;
 	if(!Giraf::User::is_user_ignore($nick))
 	{
