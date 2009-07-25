@@ -53,8 +53,7 @@ sub on_part {
 		my $module=$_on_part_functions->{$key};
 		foreach my $func (keys %$module)
 		{
-			my $element = $module->{$func};
-			push(@return,$element->{function}->($nick,$channel));
+			push(@return,$module->{$func}->{function}->($nick,$channel));
 		}
 	}
 	return @return;
@@ -71,9 +70,7 @@ sub on_quit {
 		my $module=$_on_quit_functions->{$key};
 		foreach my $func (keys %$module)
 		{
-			my $element = $module->{$func};
-
-			push(@return,$element->{function}->($nick,$message));
+			push(@return,$module->{$func}->{function}->($nick,$message));
 		}
 	}
 	return @return;
@@ -90,8 +87,7 @@ sub on_nick {
 		my $module=$_on_nick_functions->{$key};
 		foreach my $func (keys %$module)
 		{
-			my $element = $module->{$func};
-			push(@return,$element->{function}->($nick,$nick_new));
+			push(@return,$module->{$func}->{function}->($nick,$nick_new));
 
 		}
 	}
@@ -109,8 +105,7 @@ sub on_uuid_change {
                 my $module=$_on_uuid_change_functions->{$key};
                 foreach my $func (keys %$module)
                 {
-                        my $element = $module->{$func};
-                        push(@return,$element->{function}->($uuid,$uuid_new));
+                        push(@return,$module->{$func}->{function}->($uuid,$uuid_new));
 
                 }
         }
@@ -129,9 +124,7 @@ sub on_join {
 		my $module=$_on_join_functions->{$key};
 		foreach my $func (keys %$module)
 		{
-			my $element = $module->{$func};
-
-			push(@return,$element->{function}->($nick,$channel));
+			push(@return,$module->{$func}->{function}->($nick,$channel));
 		}
 	}
 
@@ -172,10 +165,10 @@ sub public_msg
 					if(my ($arg)=($what=~/^$_triggers(.*)$/))
 					{
 						my $regex=$element->{regex};
-						if ($arg =~/^$regex$/)
+						if ( $arg =~/^$regex\s*(.*?)$/ )
 						{
 							my $ref=\&{$element->{function}};
-							push(@return,$ref->($nick,$channel,$arg));
+							push(@return,$ref->($nick,$channel,$1));
 						}
 					}
 				}
@@ -189,13 +182,10 @@ sub public_msg
 			{
 				foreach my $func (keys %$module)
 				{
-					my $element = $module->{$func};
-					#First we check for triggers
-					my $regex=$element->{regex};
+					my $regex=$module->{$func}->{regex};
 					if ($what =~/$regex/)
 					{
-						my $ref=\&{$element->{function}};
-						push(@return,$ref->($nick,$channel,$what));
+						push(@return,$module->{$func}->{function}->($nick,$channel,$what));
 					}
 				}
 			}
@@ -223,9 +213,10 @@ sub private_msg
 				if(my ($arg)=($what=~/^$_triggers(.*)$/))
 				{
 					my $regex=$element->{regex};
-					if ($arg =~/^$regex$/)
+					if ($arg =~/^$regex\s*(.*?)$/)
 					{
-						push(@return,$element->{function}->($nick,$where,$arg));
+						my $ref=\&{$element->{function}};
+						push(@return,$ref->($nick,$where,$1));
 					}
 				}
 			}
@@ -236,12 +227,10 @@ sub private_msg
 			my $module=$_private_parsers->{$key};
 			foreach my $func (keys %$module)
 			{
-				my $element = $module->{$func};
-
-				my $regex=$element->{regex};
+				my $regex = $module->{$func}->{regex};
 				if ($what =~/$regex/)
 				{
-					push(@return,$element->{function}->($nick,$where,$what));
+					push(@return,$module->{$func}->{function}->($nick,$where,$what));
 				}
 			}
 		}

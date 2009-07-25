@@ -22,8 +22,8 @@ sub init {
 
 	Giraf::Core::debug("Giraf::Modules::CallVote::init()");
 
-	Giraf::Trigger::register('public_function','CallVote','callvote_main',\&callvote_main,'callvote\s+(.+?)');
-	Giraf::Trigger::register('public_function','CallVote','callvote_vote',\&callvote_vote,'[fF][12]\s*');
+	Giraf::Trigger::register('public_function','CallVote','callvote_main',\&callvote_main,'callvote');
+	Giraf::Trigger::register('public_function','CallVote','callvote_vote',\&callvote_vote,'[fF]');
 	Giraf::Trigger::register('on_nick_function','CallVote','callvote_nick',\&callvote_nick);
 }
 
@@ -47,8 +47,7 @@ sub callvote_main {
 	Giraf::Core::debug("Giraf::Modules::CallVote::callvote_main()");
 	
 	my ($sub_func,$args);
-	$what=~m/^callvote\s+((.+?)\??)$/;#To remove ending '?' to catch sub funcs
-
+	$what=~m/((.+?)\??)$/;#To remove ending '?' to catch sub funcs
 	$sub_func=$2;
 	if($1 ne $2) { $args=$1;  }
 
@@ -111,11 +110,11 @@ sub callvote_vote {
 	
 	Giraf::Core::debug("Giraf::Modules::CallVote::callvote_vote($nick,$dest,$what)");
 
-	if($_votes->{$dest}->{en_cours}) 
+	if($_votes->{$dest}->{en_cours} && $what=~/[12]/ ) 
 	{
-		if(!$_votes->{$dest}->{votants}->{$nick})
+		if( ! $_votes->{$dest}->{votants}->{$nick} )
 		{
-			if( $what=~/[fF](1)/ )
+			if( $what=~/(1)/ )
 			{
 				$_votes->{$dest}->{oui}=$_votes->{$dest}->{oui}+1;
 				$_votes->{$dest}->{votants}->{$nick}=1;
@@ -123,7 +122,7 @@ sub callvote_vote {
 				my $ligne={ action =>"NOTICE",dest=>$nick,msg=>"Vote pris en compte ! deja ".($_votes->{$dest}->{oui})." Oui"};
 				push(@return,$ligne);
 			}
-			elsif($what=~/[fF](2)/)
+			elsif($what=~/(2)/)
 			{
 				$_votes->{$dest}->{non}=$_votes->{$dest}->{non}+1;
 				$_votes->{$dest}->{votants}->{$nick}=1;

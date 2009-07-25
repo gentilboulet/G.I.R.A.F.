@@ -54,8 +54,8 @@ sub init {
 	$_dbh->do("DELETE FROM $_tbl_users_in_chan");
 	$_dbh->do("COMMIT");
 
-	Giraf::Trigger::register('public_function','core','bot_admin_main',\&bot_admin_main,'admin.*');
-	Giraf::Trigger::register('public_function','core','bot_register',\&bot_register,'register.*');
+	Giraf::Trigger::register('public_function','core','bot_admin_main',\&bot_admin_main,'admin');
+	Giraf::Trigger::register('public_function','core','bot_register',\&bot_register,'register');
 	Giraf::Admin::module_authorized_update();
 }
 
@@ -101,11 +101,10 @@ sub bot_admin_main {
 	Giraf::Core::debug("Giraf::Admin::bot_admin_main()");
 
 	my @return;
-	my ($sub_func,$args);
-	$what=~m/^admin\s+(.+?)(\s+(.+))?$/;
-
-	$sub_func=$1;
-	$args=$3;
+	my ($sub_func,$args,@tmp);
+	@tmp=split(/\s+/,$what);
+	$sub_func=shift(@tmp);
+	$args="@tmp";
 
 	Giraf::Core::debug("admin main : sub_func=$sub_func");
 
@@ -126,11 +125,10 @@ sub bot_admin_module {
 	Giraf::Core::debug("Giraf::Admin::bot_admin_module($what)");
 
 	my @return;
-	my ($sub_func,$args);
-	$what=~m/^(.+?)(\s+(.+))?$/;
-
-	$sub_func=$1;
-	$args=$3;
+	my ($sub_func,$args,@tmp);
+        @tmp=split(/\s+/,$what);
+	$sub_func=shift(@tmp);
+	$args="@tmp";
 
 	Giraf::Core::debug("admin module : sub_func=$sub_func");
 
@@ -149,11 +147,10 @@ sub bot_admin_user {
         Giraf::Core::debug("Giraf::Admin::bot_admin_user()");
 
         my @return;
-        my ($sub_func,$args);
-        $what=~m/^(.+?)(\s+(.+))?$/;
-
-        $sub_func=$1;
-        $args=$3;
+        my ($sub_func,$args,@tmp);
+        @tmp=split(/\s+/,$what);
+        $sub_func=shift(@tmp);
+        $args="@tmp";
 
 	Giraf::Core::debug("admin user : sub_func=$sub_func");
 
@@ -174,42 +171,43 @@ sub bot_disable_module {
 	Giraf::Core::debug("Giraf::Admin::bot_disable_module()");
 
 	my @return;
-	my ($ligne,$chan,$module_name);
+	my ($ligne,$chan,$module_name,@tmp);
+	@tmp=split(/\s+/,$what);
+	$chan=shift(@tmp);
+	$module_name=shift(@tmp);
 
-	$what=~m/^(#.+?)\s+(.+?)$/;
-
-	$chan=$1;
-	$module_name=$2;
-
-	if(Giraf::Admin::is_user_chan_admin($nick,$chan) && $module_name ne 'core')
+	if( $chan=~/#.*/ )
 	{
-		if(Giraf::Module::module_exists($module_name) && Giraf::Chan::known_chan($chan) )
+		if(Giraf::Admin::is_user_chan_admin($nick,$chan) && $module_name ne 'core')
 		{
-			my $mot;
-			if(!$disabled)
+			if(Giraf::Module::module_exists($module_name) && Giraf::Chan::known_chan($chan) )
 			{
-				$mot="activé";
+				my $mot;
+				if(!$disabled)
+				{
+					$mot="activé";
+				}
+				else
+				{
+					$mot="desactivé";
+				}
+				my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_modules_access (module_name,chan_name,disabled) VALUES (?,?,?)");
+				$sth->execute($module_name,$chan,$disabled);
+				$_auth_modules->{$chan}->{$module_name}={disabled=>$disabled};
+				$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] '.$mot.' pour [c=green]'.$chan.'[/c]!'};
 			}
 			else
 			{
-				$mot="desactivé";
+				$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] inconnu ou [c=green]'.$chan.'[/c] inconnu !'};
 			}
-			my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_modules_access (module_name,chan_name,disabled) VALUES (?,?,?)");
-			$sth->execute($module_name,$chan,$disabled);
-			$_auth_modules->{$chan}->{$module_name}={disabled=>$disabled};
-			$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] '.$mot.' pour [c=green]'.$chan.'[/c]!'};
+			push (@return,$ligne);
 		}
-		else
-		{
-			$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] inconnu ou [c=green]'.$chan.'[/c] inconnu !'};
-		}
-		push (@return,$ligne);
-	 }
-	 return @return;
- }
+	}
+	return @return;
+}
 
- sub bot_join {
-	 my ($nick,$dest,$what) = @_;
+sub bot_join {
+	my ($nick,$dest,$what) = @_;
 
 	Giraf::Core::debug("Giraf::Admin::bot_join()");
 
@@ -232,18 +230,19 @@ sub bot_part {
 	Giraf::Core::debug("Giraf::Admin::bot_part()");
 
 	my @return;
-	my ($chan,$reason);
-
-	$what=~m/^(#.+?)(\s+(.+?))?$/;
-
-	$chan=$1;
-	$reason = $3;
-
-	Giraf::Core::debug("part $chan, $reason");
-
-	if( Giraf::Admin::is_user_admin($nick) )
+	my ($chan,$reason,@tmp);
+	@tmp=split(/\s+/,$what);
+	$chan=shift(@tmp);
+	$reason = "@tmp";
+	
+	if( $chan=~/#.*/ )
 	{
-		Giraf::Chan::part($chan,$reason);
+		Giraf::Core::debug("part $chan, $reason");
+
+		if( Giraf::Admin::is_user_admin($nick) )
+		{
+			Giraf::Chan::part($chan,$reason);
+		}
 	}
 	return @return;
 }
@@ -272,20 +271,23 @@ sub bot_ignore_user {
 
 	Giraf::Core::debug("Giraf::Admin::bot_ignore_user()");
 
-	my @return;
-	my $ligne;
-	$args=~m/^(.+?)\s*(1)?$/;
-	my ($who,$permanent);
-	$who=$1;
-	if(!$2)
-	{
-		$permanent=0;
-	}
-	else
+	my (@return, $ligne, @tmp, $who, $permanent);
+	@tmp=split(/\s+/,$args);
+	
+	$who=shift(@tmp);
+	$permanent=shift(@tmp);
+	
+	if($permanent eq "1")
 	{
 		$permanent=1;
 	}
+	else
+	{
+		$permanent=0;
+	}
+
 	Giraf::Core::debug("bot_ignore_user who=$who, perma=$permanent");
+	
 	if(Giraf::Admin::is_user_admin($nick) )
 	{
 		if(Giraf::User::user_ignore($who,$permanent))
