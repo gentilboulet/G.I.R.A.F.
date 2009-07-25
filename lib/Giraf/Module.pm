@@ -57,7 +57,7 @@ sub init {
 
 	$_dbh = Giraf::Admin::get_dbh();
 	$_dbh->do("BEGIN TRANSACTION");
-	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules (autorun NUMERIC, file TEXT PRIMARY KEY, name TEXT,session NUMERIC, loaded NUMERIC);");
+	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules (autorun NUMERIC, file TEXT PRIMARY KEY, name TEXT, loaded NUMERIC);");
 	# Mark all modules as not loaded
 	$_dbh->do("UPDATE $_tbl_modules SET loaded=0");
 	$_dbh->do("COMMIT");
@@ -340,10 +340,10 @@ sub bot_list_module {
 
 	Giraf::Core::debug("bot_list_module()");
 
-	my $sth=$_dbh->prepare("SELECT name,autorun,session,loaded FROM $_tbl_modules");
+	my $sth=$_dbh->prepare("SELECT name,autorun,loaded FROM $_tbl_modules");
 	my @return;
-	my ($module_name,$autorun,$session,$loaded);
-	$sth->bind_columns( \$module_name, \$autorun, \$session, \$loaded);
+	my ($module_name,$autorun,$loaded);
+	$sth->bind_columns( \$module_name, \$autorun, \$loaded);
 	$sth->execute();
 	while($sth->fetch())
 	{
