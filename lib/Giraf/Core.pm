@@ -264,7 +264,7 @@ sub irc_kick
 {
 	my ( $kernel, $sender, $kicker, $where, $kicked, $reason ) = @_[ KERNEL, SENDER, ARG0, ARG1, ARG2, ARG3 ];
 	my $kicker_nick = ( split /!/, $kicker )[0];
-	emit(Giraf::Trigger:on_kick( $kicked, $where ,$kicker_nick, $reason ) );
+	emit(Giraf::Trigger::on_kick( $kicked, $where ,$kicker_nick, $reason ) );
 }
 
 sub irc_mode

@@ -293,7 +293,7 @@ sub register {
 sub unregister {
 	my ($where_to_register,$module_name,$function_name)=@_;
 
-	Giraf::Core::debug("Giraf::Module::unregister($where_to_register,$module_name,$function_name)");	
+	Giraf::Core::debug("Giraf::Trigger::unregister($where_to_register,$module_name,$function_name)");	
 
 	if( $module_name eq 'core' || Giraf::Module::module_exists($module_name) )
 	{
