@@ -161,7 +161,8 @@ sub irc_join
 {
 	my ( $kernel, $sender, $who, $where ) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
 	my ($nick,$hostmask) = ( split /!/, $who );
-	Giraf::User::add_user_info( $nick,$hostmask );
+	my $uuid=Giraf::User::add_user_info( $nick,$hostmask );
+	Giraf::Admin::add_user_in_chan($uuid,$where);
 	debug("$nick join $where");
 }
 
@@ -169,7 +170,6 @@ sub irc_msg
 {
 	my ( $kernel, $sender, $who, $where, $what ) = @_[ KERNEL, SENDER, ARG0, ARG1, ARG2 ];
 	my $nick = ( split /!/, $who )[0];
-#	debug("@$where:$nick : $what");
 	emit(Giraf::Trigger::private_msg( $nick, $who, $where, $what ) );
 }
 
@@ -178,7 +178,6 @@ sub irc_public
 	my ( $kernel, $sender, $who, $where, $what ) = @_[ KERNEL, SENDER, ARG0, ARG1, ARG2 ];
 	my $nick = ( split /!/, $who )[0];
 	my $channel = $where->[0];
-#	debug("@$where:$nick : $what");
 	emit(Giraf::Trigger::public_msg( $nick, $channel, $what ) );
 	undef;
 }
@@ -187,7 +186,7 @@ sub irc_public
 sub irc_352
 {
 	my ($kernel,$sender,$server, $infos) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
-	#giraf ~Liche tiamat.gamerscommunities.com irc.iiens.net Liche H :0 Thien
+	debug("irc_352 - irc_who");
 	my ($chan,$user,$host,$srv,$nick,$hostmask);
 	$infos=~m/^(\#.+?) (.+?) (.+?) (.+?) (.+?) (.*)$/;
 	$chan=$1;
@@ -196,19 +195,21 @@ sub irc_352
 	$srv=$4;
 	$nick=$5;
 	$hostmask=$user.'@'.$host;
-	Giraf::User::add_user_info($nick,$hostmask);
+	my $uuid=Giraf::User::add_user_info($nick,$hostmask);
+	Giraf::Admin::add_user_in_chan($uuid,$chan);
 }
 
 #irc_names
 sub irc_353
 {
 	my ($kernel,$sender,$server, $info) = @_[ KERNEL, SENDER, ARG0, ARG1];
+	debug("irc_353 - irc_names");
 	$info =~ /= (#.*) :(.*) /;
 	my $chan = $1;
 	my @users_list = split( / / , $2 );
 	foreach my $nick (@users_list)
 	{
-		debug( "Sur " . $chan.'@'. $server . " il y a {" . $nick . "}" );
+#		debug( "Sur " . $chan.'@'. $server . " il y a {" . $nick . "}" );
 		$nick=~s/^[^A-Za-z0-9]?(.*)$/$1/g;
 	}
 }
@@ -216,11 +217,11 @@ sub irc_353
 sub irc_whois 
 {
 	my ( $kernel, $sender, $infos ) = @_[ KERNEL, SENDER, ARG0 ];
+	debug("irc_whois");
 	foreach my $k (keys %$infos)
 	{
 		Giraf::Core::debug("WHOIS : $k => ".$infos->{$k});
 	}
-	Giraf::User::add_user_info($infos->{nick},$infos->{user},$infos->{host});
 }
 
 sub irc_nick
@@ -244,6 +245,8 @@ sub irc_part
 	my ( $kernel, $sender, $who, $where ) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
 	my $nick = ( split /!/, $who )[0];
 	debug("$nick part $where");
+	my $uuid = Giraf::User::getUUID($nick);
+	Giraf::Admin::del_user_in_chan($uuid,$where);
 	emit(Giraf::Trigger::on_part( $where, $nick ) );
 }
 
@@ -252,6 +255,8 @@ sub irc_quit
 	my ( $kernel, $sender, $who, $message ) = @_[ KERNEL, SENDER, ARG0, ARG1 ];
 	my $nick = ( split /!/, $who )[0];
 	debug("$nick quit : $message");
+	my $uuid=Giraf::User::getUUID($nick);
+	Giraf::Admin::del_user_in_all_chan($uuid);
 	emit(Giraf::Trigger::on_quit( $who ) );
 }
 
@@ -330,7 +335,6 @@ sub _start
 	Giraf::Module::init( $kernel,  $irc);
 	$kernel->post ($irc_session =>  'privmsg' => nickserv => "IDENTIFY ".Giraf::Config::get('botpass'));
 	$kernel->sig( INT => "sigint" );
-	#$kernel->yield("connect");
 }
 
 sub _stop

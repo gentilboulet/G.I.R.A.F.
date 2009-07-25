@@ -57,6 +57,7 @@ sub add_user_info {
 	Giraf::Core::debug("add_user_info($nick,$hostmask)");
 	my $UUID=$nick.'{'.$hostmask.'}';
 	history_add($nick,$hostmask,$UUID);
+	return $UUID;
 }
 
 sub getDataFromNick {
@@ -176,6 +177,21 @@ sub is_user_auth {
 	return (($count_nickhost > 0) || ($_botadmin_registered*$count_uuid>0));
 }
 
+sub is_user_botadmin {
+	my ($user) = @_;
+	return is_user_auth($user,10000);
+}
+
+sub is_user_admin {
+	my ($user) = @_;
+	return is_user_auth($user,1000);
+}
+
+sub is_user_chan_admin {
+	my ($user) = @_;
+	return is_user_auth($user,100);
+}
+
 sub is_user_ignore {
 	my ($username) = @_;
 	my ($ignore,$uuid,$sth);
@@ -185,10 +201,6 @@ sub is_user_ignore {
 	$sth->execute($uuid);
 	$sth->fetch();
 	return $ignore;
-}
-
-sub DESTROY {
-	Giraf::Core::debug("il a cassé mon user !");
 }
 
 1;

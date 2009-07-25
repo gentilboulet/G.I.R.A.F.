@@ -22,11 +22,15 @@ our $_kernel;
 our $_irc;
 our $_dbh;
 our $_botname;
+
 our $_tbl_config='config';
 our $_tbl_modules_access='modules_access';
+our $_tbl_chan_admin='chan_admin';
+our $_tbl_users_in_chan='users_in_chan';
 our $_tbl_users;
 our $_tbl_chans;
 our $_tbl_modules;
+
 our $_auth_modules;
 
 sub init {
@@ -36,7 +40,8 @@ sub init {
 	$_botname = $botname;
 
 	Giraf::Core::debug("Giraf::Admin::init()");
-	
+
+	$_tbl_users=$Giraf::User::_tbl_users;
 	$_tbl_chans=$Giraf::Chan::_tbl_chans;
 	$_tbl_modules=$Giraf::Module::_tbl_modules;
 
@@ -44,6 +49,9 @@ sub init {
 	$_dbh->do("BEGIN TRANSACTION");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_config (name TEXT PRIMARY KEY, value TEXT);");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules_access (module_name TEXT REFERENCES $_tbl_modules (name), chan_name TEXT REFERENCES $_tbl_chans (name), disabled NUMERIC DEFAULT 0, UNIQUE (module_name,chan_name) );");
+	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_chan_admin (chan_name TEXT REFERENCES $_tbl_chans (name), user_UUID TEXT REFERENCES $_tbl_users (UUID))");
+	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_users_in_chan (chan_name TEXT REFERENCES $_tbl_chans (name), user_UUID TEXT REFERENCES $_tbl_users (UUID))");
+	$_dbh->do("DELETE FROM $_tbl_users_in_chan");
 	$_dbh->do("COMMIT");
 
 	Giraf::Trigger::register('public_function','core','bot_admin_main',\&bot_admin_main,'admin.*');
@@ -325,4 +333,24 @@ sub module_authorized_update {
 	}
 }
 
+sub add_user_in_chan {
+	my ($uuid,$chan) = @_;
+	Giraf::Core::debug("add_user_in_chan($uuid,$chan)");
+	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_users_in_chan (user_UUID,chan_name) VALUES (?,?)");
+	return $sth->execute($uuid,$chan);
+}
+
+sub del_user_in_chan {
+	my ($uuid,$chan) = @_;
+	Giraf::Core::debug("del_user_in_chan($uuid,$chan)");
+	my $sth=$_dbh->prepare("DELETE FROM $_tbl_users_in_chan WHERE user_UUID LIKE ? AND chan_name LIKE ?");
+	return $sth->execute($uuid,$chan);
+}
+
+sub del_user_in_all_chan {
+	my ($uuid) = @_;
+	Giraf::Core::debug("del_user_in_all_chan($uuid)");
+	my $sth=$_dbh->prepare("DELETE FROM $_tbl_users_in_chan WHERE user_UUID LIKE ?");
+	return $sth->execute($uuid);
+}
 1;
