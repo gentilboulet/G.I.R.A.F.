@@ -19,8 +19,8 @@ sub init {
 
 	Giraf::Core::debug("Giraf::Modules::Search::init()");
 
-	Giraf::Trigger::register('public_function','Search','bot_search',\&bot_search,'search');
-	Giraf::Trigger::register('public_function','Search','bot_searchn',\&bot_searchn,'searchn');
+	Giraf::Trigger::register('public_function','Search','bot_search',\&bot_search,'search\s+');
+	Giraf::Trigger::register('public_function','Search','bot_searchn',\&bot_searchn,'searchn\s+');
 	if(!$_ua)
 	{
 		$_ua=LWP::UserAgent->new;
@@ -127,9 +127,7 @@ sub json_decode {
 
 sub xhtml_decode {
 	my ($data) = @_;
-	Giraf::Core::debug($data);
 	$data=~s/\&#39\;/\'/g;
-	Giraf::Core::debug($data);
 	return $data;
 }
 
