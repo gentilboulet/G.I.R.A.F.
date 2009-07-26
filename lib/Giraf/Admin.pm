@@ -49,13 +49,14 @@ sub init {
 	$_dbh->do("BEGIN TRANSACTION");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_config (name TEXT PRIMARY KEY, value TEXT);");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules_access (module_name TEXT REFERENCES $_tbl_modules (name), chan_name TEXT REFERENCES $_tbl_chans (name), disabled NUMERIC DEFAULT 0, UNIQUE (module_name,chan_name) );");
-	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_chan_admin (chan_name TEXT REFERENCES $_tbl_chans (name), user_UUID TEXT REFERENCES $_tbl_users (UUID))");
-	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_users_in_chan (chan_name TEXT REFERENCES $_tbl_chans (name), user_UUID TEXT REFERENCES $_tbl_users (UUID))");
-	$_dbh->do("DELETE FROM $_tbl_users_in_chan");
+	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_chan_admin (chan_name TEXT REFERENCES $_tbl_chans (name), user_UUID TEXT REFERENCES $_tbl_users (UUID), UNIQUE(user_UUID,chan_name))");
+	$_dbh->do("DROP TABLE IF EXISTS $_tbl_users_in_chan");
+	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_users_in_chan (chan_name TEXT REFERENCES $_tbl_chans (name), user_UUID TEXT REFERENCES $_tbl_users (UUID), UNIQUE(user_UUID,chan_name))");
 	$_dbh->do("COMMIT");
 
 	Giraf::Trigger::register('public_function','core','bot_admin_main',\&bot_admin_main,'admin');
 	Giraf::Trigger::register('public_function','core','bot_register',\&bot_register,'register');
+
 	Giraf::Admin::module_authorized_update();
 }
 
@@ -415,5 +416,6 @@ sub user_unregister {
 	my $sth=$_dbh->prepare("DELETE FROM $_tbl_chan_admin WHERE user_UUID LIKE ?");
 	return $sth->execute($uuid);
 }
+
 
 1;

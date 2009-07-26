@@ -8,7 +8,8 @@ use Giraf::Core;
 use strict;
 use warnings;
 
-use DBI;	
+use DBI;
+use POE;
 
 # Private vars
 our $_dbh;
@@ -39,6 +40,18 @@ sub init {
 	{
 		Giraf::Chan::join($chan);
 	}
+
+	Giraf::Trigger::register('on_kick_function','core','bot_on_kick',\&bot_on_kick);
+
+	POE::Session->create(
+		inline_states => {
+			_start => \&Giraf::Chan::chan_session_init,
+			_stop => \&Giraf::Chan::chan_session_stop,
+			launch_delayed_join => \&Giraf::Chan::launch_delayed_join,
+			delayed_join => \&Giraf::Chan::delayed_join,
+		},
+	);
+
 }
 
 sub join {
@@ -93,5 +106,60 @@ sub is_chan_joined {
 	$sth->fetch();
 	return $joined;
 }
+
+sub bot_on_kick {
+	my ($kicked, $chan, $kicker, $reason) = @_;
+	my @return;
+	Giraf::Core::debug("Giraf::Chan::bot_on_kick($kicked, $chan, $kicker, $reason)");
+	if($kicked eq $Giraf::Core::botname)
+	{
+		Giraf::Core::debug("Giraf::Chan::bot_on_kick()");
+		my ($sth,$autorejoin);
+		
+		$sth=$_dbh->prepare("UPDATE $_tbl_chans SET joined = 0 WHERE name LIKE ?");
+		$sth->execute($chan);
+		
+		$sth=$_dbh->prepare("SELECT autorejoin FROM $_tbl_chans WHERE name LIKE ?");
+		$sth->bind_columns(\$autorejoin);
+		$sth->execute($chan);
+		$sth->fetch();
+
+		if($autorejoin) 
+		{
+			$_kernel->post(chan_core=> launch_delayed_join => $chan);
+		}
+	}
+	return @return;
+}
+
+#################################
+# Session management subs !	#
+#################################
+sub chan_session_init {
+	my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
+	Giraf::Core::debug("chan_core::_start()");
+	$_[KERNEL]->alias_set('chan_core');
+}
+
+sub chan_session_stop {
+	Giraf::Core::debug("chan_core::_stop()");
+}
+
+sub launch_delayed_join {
+	my ($kernel, $heap, $chan) = @_[ KERNEL, HEAP, ARG0 ];
+	Giraf::Core::debug("chan_core::launch_delayed_join($chan)");
+	$kernel->delay_set( 'delayed_join' , 61, $chan);
+}
+
+sub delayed_join {
+	my ($kernel, $heap, $chan) = @_[ KERNEL, HEAP, ARG0 ];
+	Giraf::Core::debug("chan_core::delayed_join($chan)");
+	Giraf::Chan::join($chan);
+	if(!is_chan_joined($chan))
+	{
+		$kernel->delay_set( 'delayed_join' , 61, $chan);
+	}
+}
+
 
 1;
