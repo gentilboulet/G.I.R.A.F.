@@ -400,6 +400,11 @@ sub bot_set_module {
 			switch($param)
 			{
 				case 'autorun'	{$tbl_param='autorun'}
+				else 		{ 
+					my $ligne=={ action =>"MSG",dest=>$dest,msg=>'Parametre [c=red]'.$param.'[/c] incorrect !'};
+					push(@return,$ligne);
+					return @return;
+						}
 			}
 			if(module_exists($name))
 			{
