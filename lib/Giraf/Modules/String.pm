@@ -22,15 +22,15 @@ sub bot_reverse {
 	Giraf::Core::debug("bot_reverse()");
 	my ($nick,$dest,$what) = @_;
 	my $str=$what;
-#	Giraf::Core::debug(utf8::decode($str));
+	utf8::decode($str);
 	chomp($str);
 	my ($result,$char,$ligne,@return);
 	$result='';
 	while(length($str)) {
 		$char = chop($str);
 		$result = $result.$char;
-#		Giraf::Core::debug($char);
 	}
+	utf8::encode($result);
 	$ligne = {action=>"MSG",dest=>$dest,msg=>$result};
 	push(@return,$ligne);
 	return @return;
