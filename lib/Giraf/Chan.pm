@@ -85,9 +85,9 @@ sub part {
 	$_kernel->post( $_irc => part => $chan => $reason );
 }
 
-sub known_chan {
+sub is_chan_known {
 	my ($chan) = @_;
-	Giraf::Core::debug("Giraf::Chan::known_chan($chan)");
+	Giraf::Core::debug("Giraf::Chan::is_chan_known($chan)");
 	my ($count,$sth);
 	$sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_chans WHERE name LIKE ?");
 	$sth->bind_columns(\$count);

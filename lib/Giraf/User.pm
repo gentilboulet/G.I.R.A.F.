@@ -121,26 +121,29 @@ sub history_add {
 	$sth->execute($nick,time(),$UUID,$hostmask);
 	if(!$_botadmin_registered && $nick eq Giraf::Config::get('botadmin'))
 	{
-		register_botadmin($nick,$hostmask,$UUID);
+		user_register_botadmin($nick,$hostmask,$UUID);
 		$_botadmin_registered=1;
 	}
 }
 
-sub register_botadmin {
+sub user_register_botadmin {
 	my ($nick,$hostmask,$UUID) = @_;
-	Giraf::Core::debug("Giraf::User::register_botadmin($nick,$hostmask,$UUID)");
-	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_users (nick,hostmask,UUID,privileges) VALUES (?,?,?,100000)");
+	Giraf::Core::debug("Giraf::User::user_register_botadmin($nick,$hostmask,$UUID)");
+	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_users (nick,hostmask,UUID,privileges) VALUES (?,?,?,10000)");
 	$sth->execute($nick,$hostmask,$UUID);
 }
 
 sub user_register {
 	my ($nick) = @_;
 	Giraf::Core::debug("Giraf::User::user_register($nick)");
-	my ($UUID,$sth);
-	my $data=getDataFromNick($nick);
-	$UUID=$nick.'{'.$data->{hostmask}.'}';
-	$sth=$_dbh->prepare("INSERT INTO $_tbl_users (nick,hostmask,UUID) VALUES (?,?,?)");
-	$sth->execute($nick,$data->{hostmask},$data->{uuid});
+	if(!is_user_registered($nick))
+	{
+		my ($UUID,$sth);
+		my $data=getDataFromNick($nick);
+		$UUID=$nick.'{'.$data->{hostmask}.'}';
+		$sth=$_dbh->prepare("INSERT INTO $_tbl_users (nick,hostmask,UUID) VALUES (?,?,?)");
+		$sth->execute($nick,$data->{hostmask},$data->{uuid});
+	}
 	return 1;
 }
 
@@ -148,8 +151,12 @@ sub user_ignore {
 	my ($nick,$perma) = @_;
 	Giraf::Core::debug("Giraf::User::user_ignore($nick,$perma)");
 	my ($UUID,$sth);
-	if(!Giraf::Admin::is_user_admin($nick))
+	if(!Giraf::User::is_user_chan_admin($nick))
 	{
+		if(!is_user_registered($nick))
+		{
+			user_register($nick);
+		}
 		$UUID=getUUID($nick);
 		$sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_ignores (uuid,permanent) VALUES (?,?)");
 		return $sth->execute($UUID,$perma);
@@ -168,6 +175,31 @@ sub user_unignore {
 	$sth=$_dbh->prepare("DELETE FROM $_tbl_ignores WHERE uuid LIKE ?");
 	return $sth->execute($UUID);
 }
+
+sub user_update_privileges {
+	my ($nick,$level) = @_;
+	Giraf::Core::debug("Giraf::User::user_update_privileges($nick,$level)");
+	my $num=0;
+	switch($level) 
+	{
+		case 'botadmin' 	{ $num=10000;	}
+		case 'admin'		{ $num=1000;	}
+		case 'chan_admin'	{ $num=100;	}
+		case '0'		{ $num=0;	}
+		else			{ return 0;	}
+	}
+	my $uuid=getUUID($nick);
+	if(is_user_registered($nick))
+	{
+		my $sth=$_dbh->prepare("UPDATE $_tbl_users SET privileges=? WHERE UUID LIKE ?");
+		return $sth->execute($num,$uuid);
+	}
+	else
+	{
+		return 0;
+	}
+}
+
 
 sub is_user_auth {
         my ($username,$level) = @_;

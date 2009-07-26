@@ -95,7 +95,7 @@ sub get_dbh {
 	return $_dbh;
 }
 
-#Admin subs
+#Admin main subs
 sub bot_admin_main {
 	my ($nick,$dest,$what)=@_;
 
@@ -160,12 +160,14 @@ sub bot_admin_user {
 		case 'register'	{	push(@return,bot_register_user($nick,$dest)); 		}
 		case 'ignore'	{       push(@return,bot_ignore_user($nick,$dest,$args)); 	}
 		case 'unignore'	{       push(@return,bot_unignore_user($nick,$dest,$args)); 	}
+		case 'promote'	{	push(@return,bot_promote_user($nick,$dest,$args));	}
+		case 'demote'	{	push(@return,bot_demote_user($nick,$dest,$args));	}
 	}
 
 	return @return;
 }
 
-
+#Admin subs
 sub bot_disable_module {
 	my ($disabled,$nick,$dest,$what) = @_;
 
@@ -181,7 +183,7 @@ sub bot_disable_module {
 	{
 		if(Giraf::Admin::is_user_chan_admin($nick,$chan) && $module_name ne 'core')
 		{
-			if(Giraf::Module::module_exists($module_name) && Giraf::Chan::known_chan($chan) )
+			if(Giraf::Module::module_exists($module_name) && Giraf::Chan::is_chan_known($chan) )
 			{
 				my $mot;
 				if(!$disabled)
@@ -316,10 +318,9 @@ sub bot_unignore_user {
 
 	Giraf::Core::debug("Giraf::Admin::bot_unignore_user()");
 
-        my @return;
-        my $ligne;
-        $args=~m/^(.+?)\s*$/;
-        my ($who)=($1);
+        my (@return,$ligne,$who,@tmp);
+	@tmp=split(/\s+/,$args);
+	$who=shift(@tmp);
         Giraf::Core::debug("bot_unignore_user who=$who");
         if( Giraf::Admin::is_user_admin($nick) )
         {
@@ -332,6 +333,97 @@ sub bot_unignore_user {
         return @return;
 }
 
+sub bot_demote_user {
+	my ($nick,$dest,$args) = @_;
+
+	Giraf::Core::debug("Giraf::Admin::bot_unignore_user()");
+
+        my (@return,$ligne,$who,@tmp);
+	@tmp=split(/\s+/,$args);
+	$who=shift(@tmp);
+	Giraf::Core::debug("bot_demote_user who=$who");
+	if( Giraf::Admin::is_user_admin($nick) && !Giraf::Admin::is_user_botadmin($who) )
+	{
+		if(Giraf::User::user_update_privileges($who,0))
+		{
+			if( Giraf::User::is_user_chan_admin($who) )
+			{
+				my $uuid=Giraf::User::getUUID($who);
+				my $sth=$_dbh->prepare("DELETE FROM $_tbl_chan_admin WHERE user_UUID LIKE ?");
+				$sth->execute($uuid);
+			}
+			$ligne={action => "MSG", dest=>$dest,msg=>"Utilisateur [c=red]".$who."[/c] rétrogradé !"};
+		}
+		else
+		{
+			$ligne={action => "MSG", dest=>$dest,msg=>"Impossible de retrograder [c=red]".$who."[/c]"};
+		}
+	}
+	push(@return,$ligne);
+	return @return;
+}
+
+sub bot_promote_user {
+	my ($nick,$dest,$args) = @_;
+
+	Giraf::Core::debug("Giraf::Admin::bot_promote_user()");
+	my (@return,$ligne,$level,$who,$ok,@tmp);
+	$ok=0;
+	@tmp=split(/\s+/,$args);
+	$level=shift(@tmp);
+	$who=shift(@tmp);
+	Giraf::Core::debug("bot_promote_user who=$who , level=$level");
+	switch($level) 
+	{
+		case 'botadmin' 	{ 
+			if( Giraf::Admin::is_user_botadmin($nick) && !Giraf::Admin::is_user_botadmin($who) ) 
+			{
+				Giraf::User::user_register($who);
+				if(Giraf::User::user_update_privileges($who,'botadmin'))
+				{
+					$ok=1;
+				}
+			}
+		}
+		case 'admin'		{ 	
+			if( Giraf::Admin::is_user_botadmin($nick) && !Giraf::Admin::is_user_admin($who) )
+			{
+				Giraf::User::user_register($who);
+				if(Giraf::User::user_update_privileges($who,'admin'))
+				{
+					$ok=1;
+				}
+			}
+		}
+		case 'chan_admin'	{ 
+						my $chan=shift(@tmp);
+						if( Giraf::Admin::is_user_admin($nick) && !Giraf::Admin::is_user_chan_admin($who,$chan) && Giraf::Chan::is_chan_known($chan) )
+						{
+							Giraf::User::user_register($who);
+							my $uuid=Giraf::User::getUUID($who);
+							my $sth=$_dbh->prepare("INSERT INTO $_tbl_chan_admin (chan_name,user_UUID) VALUES (?,?)");
+							if( Giraf::User::user_update_privileges($who,'chan_admin') && $sth->execute($chan,$uuid) )
+							{
+								$ok=1;
+							}
+
+						}
+						$level="$level de $chan";
+					}
+		else			{ return @return }
+	}
+
+	if(!$ok)
+	{
+		$ligne={action=>"MSG",dest=>$dest,msg=>"Impossible de promouvoir [c=red]".$who."[/c] $level !"};
+	}
+	else
+	{
+		$ligne={action=>"MSG",dest=>$dest,msg=>"[c=red]".$who."[/c] promu $level !"};
+	}
+	push(@return,$ligne);
+	return @return;
+}
 
 #Admin user management subs
 sub is_user_botadmin {
@@ -361,7 +453,7 @@ sub is_user_chan_admin {
 		$sth->bind_columns(\$count);
 		$sth->execute($chan,$uuid);
 		$sth->fetch();
-		return $count;
+		return (0+$count);
 	}
 }
 

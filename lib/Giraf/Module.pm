@@ -344,7 +344,7 @@ sub bot_list_module {
 	$sth->execute();
 	while($sth->fetch())
 	{
-		my $ligne= {action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] : autorun=[color=orange]'.$autorun.'[/color];loaded=[c=teal]'.$loaded.'[/c]'};
+		my $ligne= {action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] : autorun=[color=orange]'.$autorun.'[/color];loaded=[c=teal]'.$loaded.'[/c];enabled on [c=green]'.$dest.'[/c]=[c=red]'.(0+Giraf::Admin::module_authorized($module_name,$dest)).'[/c]'};
 		push(@return,$ligne);
 	}
 	return @return
