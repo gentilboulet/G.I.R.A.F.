@@ -213,14 +213,21 @@ sub bot_join {
 	Giraf::Core::debug("Giraf::Admin::bot_join()");
 
 	my @return;
-	my ($chan,$reason);
+	my ($chan,$autorejoin,@tmp);
+	@tmp=split(/\s+/,$what);
+	$chan=shift(@tmp);
+	$autorejoin=shift(@tmp);
 
-	$what=~m/^(#\S+?)$/;
-
-	$chan=$1;
-	if( Giraf::Admin::is_user_admin($nick) )
+	if($chan=~m/^(#\S+?)$/)
 	{
-		Giraf::Chan::join($chan);
+		if( Giraf::Admin::is_user_admin($nick) )
+		{
+			Giraf::Chan::join($chan);
+			if($autorejoin)
+			{
+				Giraf::Chan::autorejoin($chan,1);
+			}
+		}
 	}
 	return @return;
 }
@@ -235,7 +242,7 @@ sub bot_part {
 	@tmp=split(/\s+/,$what);
 	$chan=shift(@tmp);
 	$reason = "@tmp";
-	
+
 	if( $chan=~/#.*/ )
 	{
 		Giraf::Core::debug("part $chan, $reason");

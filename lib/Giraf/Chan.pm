@@ -107,6 +107,7 @@ sub is_chan_joined {
 	return $joined;
 }
 
+################################"
 sub bot_on_kick {
 	my ($kicked, $chan, $kicker, $reason) = @_;
 	my @return;

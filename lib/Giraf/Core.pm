@@ -36,7 +36,7 @@ sub init {
 
 sub run {
 
-	# We create a new PoCo-IRC object and component.
+# We create a new PoCo-IRC object and component.
 	$irc = POE::Component::IRC->spawn(
 		nick     => $botname,
 		server   => Giraf::Config::get('server'),
