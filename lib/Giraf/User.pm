@@ -144,16 +144,6 @@ sub user_register {
 	return 1;
 }
 
-sub user_unregister {
-	my ($nick) = @_;
-	Giraf::Core::debug("Giraf::User::user_unregister($nick)");
-	my ($UUID,$sth);
-	$UUID=getUUID($nick);
-	$sth=$_dbh->prepare("DELETE FROM $_tbl_users WHERE UUID LIKE ?");
-	$sth->execute($UUID);
-	return Giraf::Admin::user_unregister($UUID);
-}
-
 sub user_ignore {
 	my ($nick,$perma) = @_;
 	Giraf::Core::debug("Giraf::User::user_ignore($nick,$perma)");
