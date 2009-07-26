@@ -25,7 +25,7 @@ our $_tbl_config = 'config';
 
 sub mod_load {
 	my ($mod) = @_;
-	
+	Giraf::Core::debug("Giraf::Module::mod_load($mod)");	
 	eval ("require Giraf::Modules::$mod;");
 	return $@;
 }
@@ -33,20 +33,20 @@ sub mod_load {
 sub mod_run {
 	my ($mod, $fn, @args) = @_;
 	my $ret;
-
+	Giraf::Core::debug("Giraf::Module::mod_run($mod)");
 	eval ('$ret = ' . '&Giraf::Modules::' . $mod . '::' . $fn . '(@args);');
 	return $ret;
 }
 
 sub mod_mark_loaded {
 	my ($mod,$bool) = @_;
-
+	Giraf::Core::debug("Giraf::Module::mod_mark_loaded($mod,$bool)");
 	my $req = $_dbh->prepare("UPDATE $_tbl_modules SET loaded=? WHERE name LIKE ?");
 	$req->execute($bool,$mod);
 }
 
 sub init {
-	my ( $classe, $ker, $irc_session ) = @_;
+	my ( $ker, $irc_session ) = @_;
 	$_kernel  = $ker;
 	$_irc     = $irc_session;
 
@@ -57,18 +57,15 @@ sub init {
 
 	$_dbh = Giraf::Admin::get_dbh();
 	$_dbh->do("BEGIN TRANSACTION");
-	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules (autorun NUMERIC, file TEXT PRIMARY KEY, name TEXT,session NUMERIC, loaded NUMERIC);");
-	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_users (name TEXT PRIMARY KEY, privileges NUMERIC);");
-	$req=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_users(name,privileges) VALUES(?,10000);");
-	$req->execute(Giraf::Config::get('botadmin'));
+	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules (autorun NUMERIC, file TEXT PRIMARY KEY, name TEXT, loaded NUMERIC);");
 	# Mark all modules as not loaded
 	$_dbh->do("UPDATE $_tbl_modules SET loaded=0");
 	$_dbh->do("COMMIT");
 
-	Giraf::Trigger::register('public_function','core','bot_say',\&bot_say,'say .*');
-	Giraf::Trigger::register('public_function','core','bot_do',\&bot_do,'do .*');
-	Giraf::Trigger::register('public_function','core','bot_quit',\&bot_quit,'quit.*');
-	Giraf::Trigger::register('public_function','core','bot_module_main',\&bot_module_main,'module.*');
+	Giraf::Trigger::register('public_function','core','bot_say',\&bot_say,'say');
+	Giraf::Trigger::register('public_function','core','bot_do',\&bot_do,'do');
+	Giraf::Trigger::register('public_function','core','bot_quit',\&bot_quit,'quit');
+	Giraf::Trigger::register('public_function','core','bot_module_main',\&bot_module_main,'module');
 
 	my $sth=$_dbh->prepare("SELECT file,name,autorun FROM $_tbl_modules");
 	my ($module, $module_name, $autorun);
@@ -97,9 +94,7 @@ sub init {
 sub bot_say {
 	my($nick, $dest, $what)=@_;
 	my @return;
-	my $regex= "say (.*)";
-	my ($txt) = $what=~/$regex/ ;
-	my $ligne={ action =>"MSG",dest=>$dest,msg=>$txt};
+	my $ligne={ action =>"MSG",dest=>$dest,msg=>$what};
 	push(@return,$ligne);
 	return @return;
 }
@@ -107,9 +102,7 @@ sub bot_say {
 sub bot_do {
 	my($nick, $dest, $what)=@_;
 	my @return;
-	my $regex= "do (.*)";
-	my ($txt) = $what=~/$regex/ ;
-	my $ligne={ action =>"ACTION",dest=>$dest,msg=>$txt};
+	my $ligne={ action =>"ACTION",dest=>$dest,msg=>$what};
 	push(@return,$ligne);
 	return @return;
 }
@@ -117,17 +110,17 @@ sub bot_do {
 sub bot_quit {
 	my($nick, $dest, $what)=@_;
 
-	Giraf::Core::debug("bot_quit()");
+	Giraf::Core::debug("Giraf::Module::bot_quit()");
 
 	my @return;
-	if(is_user_auth($nick,10000))
+	if(Giraf::Admin::is_user_botadmin($nick))
 	{
 		my $reason="All your bot are belong to us";
-		if($what=~m/quit (.+)/)
+		if($what)
 		{
-			$reason=$1;
+			$reason=$what;
 		}
-		Giraf::Trigger->on_bot_quit($reason);
+		Giraf::Trigger::on_bot_quit($reason);
 	}
 	return @return
 }
@@ -136,14 +129,13 @@ sub bot_quit {
 sub bot_module_main {
 	my ($nick,$dest,$what)=@_;
 	
-	Giraf::Core::debug("bot_module_main");
+	Giraf::Core::debug("Giraf::Module::bot_module_main()");
 	
 	my @return;
-	my ($sub_func,$args);
-	$what=~m/^module\s+(.+?)(\s+(.+))?$/;
-	
-	$sub_func=$1;
-	$args=$3;
+	my ($sub_func,$args,@tmp);
+	@tmp=split(/\s+/,$what);	
+	$sub_func=shift(@tmp);
+	$args="@tmp";
 	
 	Giraf::Core::debug("main : sub_func=$sub_func");
 
@@ -166,11 +158,11 @@ sub bot_reload_modules
 {
 	my ($nick,$dest,$what)=@_;
 
-	Giraf::Core::debug("bot_reload_modules()");
+	Giraf::Core::debug("Giraf::Module::bot_reload_modules()");
 
 	my @return;
 	my $ligne;
-	if(is_user_auth($nick,10000) )
+	if(Giraf::Admin::is_user_admin($nick) )
 	{
 		foreach my $file_pm (keys %INC) {
 			if( my ($module_name) = $file_pm =~/^Giraf\/Modules\/(.+)\.pm$/)
@@ -202,33 +194,34 @@ sub bot_reload_modules
 
 sub bot_load_module {
 	my($nick, $dest, $module_name)=@_;
+	my $mod_exact_name;
 	my @return;
 
-	Giraf::Core::debug("bot_load_module()");
+	Giraf::Core::debug("Giraf::Module::bot_load_module($module_name)");
 
-	if(is_user_auth($nick,10000))
+	if(Giraf::Admin::is_user_admin($nick))
 	{
 
-		if(module_exists($module_name))
+		if($mod_exact_name=module_exists($module_name))
 		{
 			my $ligne;
-			if(!module_loaded($module_name))
+			if(!module_loaded($mod_exact_name))
 			{
 
-				my $err = mod_load($module_name);
+				my $err = mod_load($mod_exact_name);
 				if ($err) {
-					print "Error while loading module \"$module_name\" ! Reason: $err\n";
-					$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] borken ! (non chargé)'};
+					print "Error while loading module \"$mod_exact_name\" ! Reason: $err\n";
+					$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$mod_exact_name.'[/c] borken ! (non chargé)'};
 				}
 				else {
-					mod_run($module_name, 'init', $_kernel, $_irc); # TODO: check return
-					mod_mark_loaded($module_name,1);
-					$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] chargé !'};
+					mod_run($mod_exact_name, 'init', $_kernel, $_irc); # TODO: check return
+					mod_mark_loaded($mod_exact_name,1);
+					$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$mod_exact_name.'[/c] chargé !'};
 				}
 			}
 			else
 			{
-				$ligne={action=>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] déja chargé !'};
+				$ligne={action=>"MSG",dest=>$dest,msg=>'Module [c=red]'.$mod_exact_name.'[/c] déja chargé !'};
 			}
 			push(@return,$ligne);
 		}
@@ -246,18 +239,19 @@ sub bot_load_module {
 sub bot_unload_module {
 	my($nick, $dest, $module_name)=@_;
 
-	Giraf::Core::debug("bot_unload_module()");
-
+	Giraf::Core::debug("Giraf::Module::bot_unload_module($module_name)");
+	
+	my $mod_exact_name;
 	my @return;
 
-	if(is_user_auth($nick,10000))
+	if(Giraf::Admin::is_user_admin($nick))
 	{
-		if( module_exists($module_name) )
+		if( $mod_exact_name=module_exists($module_name) )
 		{
-			mod_run($module_name, 'unload'); # TODO: check return
-			mod_mark_loaded($module_name,0);
-			delete($INC{'Giraf/Modules/'.$module_name.'.pm'});
-			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] déchargé !'};
+			mod_run($mod_exact_name, 'unload'); # TODO: check return
+			mod_mark_loaded($mod_exact_name,0);
+			delete($INC{'Giraf/Modules/'.$mod_exact_name.'.pm'});
+			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$mod_exact_name.'[/c] déchargé !'};
 			push(@return,$ligne);
 		}
 		else
@@ -273,11 +267,11 @@ sub bot_unload_module {
 sub bot_add_module {
 	my($nick, $dest, $what)=@_;
 
-	Giraf::Core::debug("bot_add_module()");
+	Giraf::Core::debug("Giraf::Module::bot_add_module()");
 
 	my $regex= '(.+)\s+(.+\.pm)\s+([0-9]*)';
 	my @return;
-	if(is_user_auth($nick,10000))
+	if(Giraf::Admin::is_user_botadmin($nick))
 	{
 		if( my ($name,$file,$autorun) = $what=~/$regex/ )
 		{
@@ -307,11 +301,11 @@ sub bot_add_module {
 sub bot_del_module {
 	my($nick, $dest, $module_name)=@_;
 
-	Giraf::Core::debug("bot_del_module()");
+	Giraf::Core::debug("Giraf::Module::bot_del_module($module_name)");
 
 	my @return;
 
-	if(is_user_auth($nick,10000))
+	if(Giraf::Admin::is_user_botadmin($nick))
 	{
 		if (!$module_name)
 		{
@@ -341,16 +335,16 @@ sub bot_del_module {
 sub bot_list_module {
 	my($nick, $dest, $what)=@_;
 
-	Giraf::Core::debug("bot_list_module()");
+	Giraf::Core::debug("Giraf::Module::bot_list_module()");
 
-	my $sth=$_dbh->prepare("SELECT name,autorun,session,loaded FROM $_tbl_modules");
+	my $sth=$_dbh->prepare("SELECT name,autorun,loaded FROM $_tbl_modules");
 	my @return;
-	my ($module_name,$autorun,$session,$loaded);
-	$sth->bind_columns( \$module_name, \$autorun, \$session, \$loaded);
+	my ($module_name,$autorun,$loaded);
+	$sth->bind_columns( \$module_name, \$autorun, \$loaded);
 	$sth->execute();
 	while($sth->fetch())
 	{
-		my $ligne= {action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] : autorun=[color=orange]'.$autorun.'[/color];loaded=[c=teal]'.$loaded.'[/c]'};
+		my $ligne= {action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] : autorun=[color=orange]'.$autorun.'[/color];loaded=[c=teal]'.$loaded.'[/c];enabled on [c=green]'.$dest.'[/c]=[c=red]'.(0+Giraf::Admin::module_authorized($module_name,$dest)).'[/c]'};
 		push(@return,$ligne);
 	}
 	return @return
@@ -359,7 +353,7 @@ sub bot_list_module {
 sub bot_available_module {
 	my($nick, $dest, $what)=@_;
 
-	Giraf::Core::debug("bot_available_module()");
+	Giraf::Core::debug("Giraf::Module::bot_available_module()");
 
 	my @return;
 	my @dir;
@@ -371,15 +365,18 @@ sub bot_available_module {
 
 	foreach my $file (@dir)
 	{
-		if($file=~/\.pm$/)
+		if($file=~/^(.*)\.pm$/)
 		{
-			if($output)
+			if(!module_exists($1))
 			{
-				$output=$output.", ".$file;
-			}
-			else
-			{
-				$output=$file;
+				if($output)
+				{
+					$output=$output.", ".$file;
+				}
+				else
+				{
+					$output=$file;
+				}
 			}
 		}
 	}
@@ -389,15 +386,14 @@ sub bot_available_module {
 }
 
 sub bot_set_module {
-	my($nick, $dest, $what)=@_;
+	my ($nick, $dest, $what)=@_;
 	my @return;
 	my $regex= '(.*)\s+(.*)\s+(.*)';
 
-	Giraf::Core::debug("bot_set_module()");
+	Giraf::Core::debug("Giraf::Module::bot_set_module()");
 
-	if(is_user_auth($nick,10000))
+	if(Giraf::Admin::is_user_botadmin($nick))
 	{
-		Giraf::Core::debug("regex=$regex : what=$what");
 		if( my ($name,$param,$value) = $what=~/^$regex$/ )
 		{
 			my $tbl_param;
@@ -429,10 +425,12 @@ sub bot_set_module {
 }
 
 sub modules_on_quit {
-        my ($module,$module_name,$sth);
+	
+	Giraf::Core::debug("Giraf::Module::modules_on_quit()");
+        
+	my ($module,$module_name,$sth);
 
         Giraf::Core::set_quit();
-        Giraf::Core::debug("modules_on_quit()");
 
         $sth=$_dbh->prepare("SELECT file,name FROM $_tbl_modules WHERE loaded=1");
         $sth->bind_columns( \$module , \$module_name);
@@ -453,39 +451,36 @@ sub modules_on_quit {
 #Utility subs
 sub module_exists {
 	my ($module_name) = @_;
+	
+	Giraf::Core::debug("Giraf::Module::module_exists($module_name)");
 
-	my $count;
-
-	my $sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_modules WHERE name LIKE ?");
-	$sth->bind_columns( \$count );
+	my ($count,$exact_name,$sth);
+	
+	$sth=$_dbh->prepare("SELECT COUNT(*),name FROM $_tbl_modules WHERE name LIKE ?");
+	$sth->bind_columns( \$count , \$exact_name );
 	$sth->execute($module_name);
 	$sth->fetch();
-
-	return $count;
-
+	if($count>0)
+	{
+		return $exact_name;
+	}
+	else
+	{
+		return $count;
+	}
 }
 
 sub module_loaded {
 	my ($mod) =@_;
-	my $count;
-	my $sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_modules WHERE loaded=1 AND name LIKE ?");
+
+	Giraf::Core::debug("Giraf::Module::module_loaded($mod)");
+
+	my ($count,$sth);
+	$sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_modules WHERE loaded=1 AND name LIKE ?");
 	$sth->bind_columns(\$count);
 	$sth->execute($mod);
 	$sth->fetch();
 	return $count;
 }
 
-
-#TEMPORARY while no User module
-sub is_user_auth {
-	my ($username,$level) = @_;
-
-	my $sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_users WHERE name LIKE ? AND privileges >= ?");
-	my $count;
-
-	$sth->bind_columns( \$count);
-	$sth->execute($username,$level);
-	$sth->fetch();
-	return $count;
-}
 1;
