@@ -365,15 +365,18 @@ sub bot_available_module {
 
 	foreach my $file (@dir)
 	{
-		if($file=~/\.pm$/)
+		if($file=~/^(.*)\.pm$/)
 		{
-			if($output)
+			if(!module_exists($1))
 			{
-				$output=$output.", ".$file;
-			}
-			else
-			{
-				$output=$file;
+				if($output)
+				{
+					$output=$output.", ".$file;
+				}
+				else
+				{
+					$output=$file;
+				}
 			}
 		}
 	}
