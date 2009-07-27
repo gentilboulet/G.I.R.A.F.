@@ -42,7 +42,7 @@ sub init {
 	$_dbh->do("COMMIT;");
 	
 	Giraf::Trigger::register('on_nick_function','core','bot_on_nick_change',\&bot_on_nick_change);
-
+	Giraf::Trigger::register('on_uuid_change_function','core','bot_on_uuid_change',\&bot_on_uuid_change);
 }
 
 sub bot_on_nick_change {
@@ -92,6 +92,14 @@ sub getDataFromNick {
 	return $return;
 }
 
+sub bot_on_uuid_change {
+	my ($uuid,$uuid_new) = @_;
+	my @return;
+	my $sth=$_dbh->prepare("UPDATE $_tbl_nick_history SET UUID=? WHERE UUID LIKE ?");
+	$sth->execute($uuid_new,$uuid);
+	return @return;
+}
+
 sub getUUID {
 	my ($nick)=@_;
 	Giraf::Core::debug("Giraf::User::getUUID($nick)");	
@@ -117,12 +125,24 @@ sub history_add {
 
 	Giraf::Core::debug("Giraf::User::history_add($nick,$hostmask,$UUID)");
 
-	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_nick_history (nick,last_seen,UUID,hostmask) VALUES (?,?,?,?)");
+	my ($sth,$uuid_with_privileges);
+	$sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_nick_history (nick,last_seen,UUID,hostmask) VALUES (?,?,?,?)");
 	$sth->execute($nick,time(),$UUID,$hostmask);
 	if(!$_botadmin_registered && $nick eq Giraf::Config::get('botadmin'))
 	{
 		user_register_botadmin($nick,$hostmask,$UUID);
 		$_botadmin_registered=1;
+	}
+	$sth=$_dbh->prepare("SELECT UUID FROM $_tbl_users WHERE nick LIKE ? AND hostmask LIKE ?");
+	$sth->bind_columns(\$uuid_with_privileges);
+	$sth->execute($nick,$hostmask);
+	$sth->fetch();
+	if($uuid_with_privileges)
+	{
+		if($UUID ne $uuid_with_privileges)
+		{
+			Giraf::Core::emit(Giraf::Trigger::on_uuid_change($UUID,$uuid_with_privileges));
+		}
 	}
 }
 
@@ -130,7 +150,7 @@ sub user_register_botadmin {
 	my ($nick,$hostmask,$UUID) = @_;
 	Giraf::Core::debug("Giraf::User::user_register_botadmin($nick,$hostmask,$UUID)");
 	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_users (nick,hostmask,UUID,privileges) VALUES (?,?,?,10000)");
-	$sth->execute($nick,$hostmask,$UUID);
+	$sth->execute($nick,$hostmask,$nick.'{'.$hostmask.'}');
 }
 
 sub user_register {
