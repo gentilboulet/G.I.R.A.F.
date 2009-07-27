@@ -196,7 +196,7 @@ sub public_msg
 						if ( $arg =~/^$regex\s*(.*?)$/ )
 						{
 							my $ref=\&{$element->{function}};
-							push(@return,$ref->($nick,$channel,$1,$arg));
+							push(@return,$ref->($nick,$channel,$+,$arg));
 						}
 					}
 				}
@@ -244,7 +244,7 @@ sub private_msg
 					if ($arg =~/^$regex\s*(.*?)$/)
 					{
 						my $ref=\&{$element->{function}};
-						push(@return,$ref->($nick,$where,$1,$arg));
+						push(@return,$ref->($nick,$where,$+,$arg));
 					}
 				}
 			}
