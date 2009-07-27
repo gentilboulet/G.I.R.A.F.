@@ -15,6 +15,7 @@ use Switch;
 # Private vars
 our $_kernel;
 our $_votes;
+our $_session_started=0;
 
 sub init {
 	my ($ker,$irc_session) = @_;
@@ -24,7 +25,10 @@ sub init {
 
 	Giraf::Trigger::register('public_function','CallVote','callvote_main',\&callvote_main,'callvote');
 	Giraf::Trigger::register('public_function','CallVote','callvote_vote',\&callvote_vote,'[fF]');
-	Giraf::Trigger::register('on_nick_function','CallVote','callvote_nick',\&callvote_nick);
+
+	Giraf::Trigger::register('on_uuid_change_function','CallVote','callvote_uuid_change',\&callvote_uuid_change);
+
+	start_session();
 }
 
 sub unload {
@@ -33,11 +37,9 @@ sub unload {
 
 	Giraf::Trigger::unregister('public_function','CallVote','callvote_main');
 	Giraf::Trigger::unregister('public_function','CallVote','callvote_vote');
-	Giraf::Trigger::unregister('on_nick_function','CallVote','callvote_nick');
-	foreach my $d (keys %{$_votes})
-	{
-		delete($_votes->{$d});
-	}
+	Giraf::Trigger::unregister('on_uuid_change_function','CallVote','callvote_uuid_change');
+	
+	$_kernel->post(callvote_core=>vote_cleanup=>());
 }
 
 sub callvote_main {
@@ -47,9 +49,9 @@ sub callvote_main {
 	Giraf::Core::debug("Giraf::Modules::CallVote::callvote_main()");
 	
 	my ($sub_func,$args);
-	$what=~m/((.+?)\??)$/;#To remove ending '?' to catch sub funcs
+	$what=~m/((.+?)\??)(\s+[0-9]+)?\s*$/;#To remove ending '?' to catch sub funcs
 	$sub_func=$2;
-	if($1 ne $2) { $args=$1;  }
+	if($1 ne $2) { $args=$what;  }
 
 
 	switch ($sub_func)
@@ -107,17 +109,18 @@ sub callvote_vote {
 	my($nick, $dest, $what)=@_;
 	my @return;
 	$dest=lc $dest;
-	
+
 	Giraf::Core::debug("Giraf::Modules::CallVote::callvote_vote($nick,$dest,$what)");
+	my $uuid=Giraf::User::getUUID($nick);
 
 	if($_votes->{$dest}->{en_cours} && $what=~/[12]/ ) 
 	{
-		if( ! $_votes->{$dest}->{votants}->{$nick} )
+		if( ! $_votes->{$dest}->{votants}->{$uuid} )
 		{
 			if( $what=~/(1)/ )
 			{
 				$_votes->{$dest}->{oui}=$_votes->{$dest}->{oui}+1;
-				$_votes->{$dest}->{votants}->{$nick}=1;
+				$_votes->{$dest}->{votants}->{$uuid}=1;
 				$_kernel->post(callvote_core=> vote_update => $dest);
 				my $ligne={ action =>"NOTICE",dest=>$nick,msg=>"Vote pris en compte ! deja ".($_votes->{$dest}->{oui})." Oui"};
 				push(@return,$ligne);
@@ -125,7 +128,7 @@ sub callvote_vote {
 			elsif($what=~/(2)/)
 			{
 				$_votes->{$dest}->{non}=$_votes->{$dest}->{non}+1;
-				$_votes->{$dest}->{votants}->{$nick}=1;
+				$_votes->{$dest}->{votants}->{$uuid}=1;
 				$_kernel->post(callvote_core=> vote_update => $dest);
 				my $ligne={ action =>"NOTICE",dest=>$nick,msg=>"Vote pris en compte ! deja ".($_votes->{$dest}->{non})." Non"};
 				push(@return,$ligne);
@@ -174,11 +177,14 @@ sub callvote_status {
 	return @return;
 }
 
-sub callvote_nick {
-	my ($nick,$nick_new)=@_;
+sub callvote_uuid_change {
+	my ($uuid,$uuid_new)=@_;
+
+	Giraf::Core::debug("Giraf::Modules::CallVote::callvote_uuid_change($uuid,$uuid_new)");
+
 	foreach my $k (keys(%$_votes))
 	{
-		$_votes->{$k}->{votants}->{$nick_new}=$_votes->{$k}->{votants}->{$nick};
+		$_votes->{$k}->{votants}->{$uuid_new}=$_votes->{$k}->{votants}->{$uuid};
 	}
 	return;
 }
@@ -215,7 +221,7 @@ sub vote_update {
 sub vote_start {
 	my ($kernel, $heap, $dest, $vote) = @_[ KERNEL, HEAP, ARG0 , ARG1];
 	
-	Giraf::Core::debug("callvote_core::vote_start()");
+	Giraf::Core::debug("callvote_core::vote_start($vote,".$_votes->{$dest}->{delay}.")");
 	
 	my @return;
 	my $ligne={ action =>"MSG",dest=>$dest,msg=>"callvote [c=teal]$vote ?[/c]"};
@@ -261,18 +267,70 @@ sub vote_end {
 		my $ligne={ action =>"MSG",dest=>$dest,msg=>"[c=teal]$vote [/c] Non (".$ratio."% de ".($oui+$non)." votant$votants)"};
 		push(@return,$ligne);
 	}
+	delete($_votes->{$dest});
 	Giraf::Core::emit(@return);
 }
 
-POE::Session->create(
-	inline_states => {
-		_start => \&Giraf::Modules::CallVote::callvote_init,
-		_stop => \&Giraf::Modules::CallVote::callvote_stop,
-		vote_update => \&Giraf::Modules::CallVote::vote_update,
-		vote_start => \&Giraf::Modules::CallVote::vote_start,
-		vote_end => \&Giraf::Modules::CallVote::vote_end,
-	},
-);
+sub vote_cleanup {
+	my ($k, $h) = @_[ KERNEL, HEAP];
+	Giraf::Core::debug("callvote_core::vote_cleanup()");
+	foreach my $chan (keys %{$_votes})
+	{
+		if($_votes->{$chan}->{en_cours})
+		{
+			$k->post(callvote_core => vote_end=>$chan);
+			$k->alarm_remove($_votes->{$chan}->{delay_id});
+		}
+	}
+	$k->post(vote_clean_events => ());
+}
 
+sub clean_events {
+	my ($k, $h) = @_[ KERNEL, HEAP];
+	Giraf::Core::debug("callvote_core::clean_events()");
+	$k->state('vote_start');
+	$k->state('vote_end');
+	$k->state('vote_update');
+	$k->state('vote_cleanup');
+	$k->state('vote_clean_events');
+}
+
+sub new_events {
+	my ($k, $h) = @_[ KERNEL, HEAP];
+	Giraf::Core::debug("callvote_core::new_events()");
+	$k->state('_start', \&Giraf::Modules::CallVote::callvote_init);
+	$k->state('_stop', \&Giraf::Modules::CallVote::callvote_stop);
+
+	$k->state('vote_update',\&Giraf::Modules::CallVote::vote_update);
+	$k->state('vote_start',\&Giraf::Modules::CallVote::vote_start);
+	$k->state('vote_end',\&Giraf::Modules::CallVote::vote_end);
+
+	$k->state('vote_cleanup', \&Giraf::Modules::CallVote::vote_cleanup);	
+	$k->state('vote_clean_events', \&Giraf::Modules::CallVote::clean_events);	
+	$k->state('vote_new_events',\&Giraf::Modules::CallVote::new_events);
+}
+
+sub start_session {
+	Giraf::Core::debug("Giraf::Modules::CallVote::start_session()");
+	$_kernel->post(callvote_core=>vote_new_events=>());
+	if(!$_session_started)
+	{
+		$_session_started=1;
+		POE::Session->create(
+			inline_states => {
+				_start => \&Giraf::Modules::CallVote::callvote_init,
+				_stop => \&Giraf::Modules::CallVote::callvote_stop,
+				vote_update => \&Giraf::Modules::CallVote::vote_update,
+				vote_start => \&Giraf::Modules::CallVote::vote_start,
+				vote_end => \&Giraf::Modules::CallVote::vote_end,
+
+				vote_cleanup => \&Giraf::Modules::CallVote::vote_cleanup,
+				vote_clean_events => \&Giraf::Modules::CallVote::clean_events,
+				vote_new_events => \&Giraf::Modules::CallVote::new_events,
+			},
+
+		);
+	}
+}
 
 1;
