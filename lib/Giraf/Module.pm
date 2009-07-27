@@ -57,7 +57,7 @@ sub init {
 
 	$_dbh = Giraf::Admin::get_dbh();
 	$_dbh->do("BEGIN TRANSACTION");
-	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules (autorun NUMERIC, file TEXT PRIMARY KEY, name TEXT, loaded NUMERIC);");
+	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules (autorun NUMERIC, name TEXT PRIMARY KEY, loaded NUMERIC DEFAULT 0);");
 	# Mark all modules as not loaded
 	$_dbh->do("UPDATE $_tbl_modules SET loaded=0");
 	$_dbh->do("COMMIT");
@@ -67,9 +67,9 @@ sub init {
 	Giraf::Trigger::register('public_function','core','bot_quit',\&bot_quit,'quit');
 	Giraf::Trigger::register('public_function','core','bot_module_main',\&bot_module_main,'module');
 
-	my $sth=$_dbh->prepare("SELECT file,name,autorun FROM $_tbl_modules");
-	my ($module, $module_name, $autorun);
-	$sth->bind_columns( \$module, \$module_name, \$autorun );
+	my $sth=$_dbh->prepare("SELECT name,autorun FROM $_tbl_modules");
+	my ( $module_name, $autorun);
+	$sth->bind_columns( \$module_name, \$autorun );
 	$sth->execute();
 	while($sth->fetch() )
 	{
@@ -269,16 +269,17 @@ sub bot_add_module {
 
 	Giraf::Core::debug("Giraf::Module::bot_add_module()");
 
-	my $regex= '(.+)\s+(.+\.pm)\s+([0-9]*)';
+	my $regex= '(.+)\s+([01]?)';
 	my @return;
 	if(Giraf::Admin::is_user_botadmin($nick))
 	{
-		if( my ($name,$file,$autorun) = $what=~/$regex/ )
+		if( my ($name,$autorun) = $what=~/$regex/ )
 		{
+			my $file="$name.pm";
 			if( -e "lib/Giraf/Modules/".$file )
 			{
-				my $sth=$_dbh->prepare("INSERT INTO $_tbl_modules (name,file,autorun) VALUES (?,?,?)");
-				$sth->execute($name,$file,$autorun);
+				my $sth=$_dbh->prepare("INSERT INTO $_tbl_modules (name,autorun) VALUES (?,?)");
+				$sth->execute($name,$autorun);
 				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] ajoute !'};
 				push(@return,$ligne);
 			}
@@ -437,8 +438,8 @@ sub modules_on_quit {
 
         Giraf::Core::set_quit();
 
-        $sth=$_dbh->prepare("SELECT file,name FROM $_tbl_modules WHERE loaded=1");
-        $sth->bind_columns( \$module , \$module_name);
+        $sth=$_dbh->prepare("SELECT name FROM $_tbl_modules WHERE loaded=1");
+        $sth->bind_columns( \$module_name);
         $sth->execute();
 
         while($sth->fetch())
