@@ -55,7 +55,9 @@ sub init {
 	$_dbh->do("COMMIT");
 
 	Giraf::Trigger::register('public_function','core','bot_admin_main',\&bot_admin_main,'admin');
-	Giraf::Trigger::register('public_function','core','bot_register',\&bot_register,'register');
+	Giraf::Trigger::register('public_function','core','bot_admin_user',\&bot_admin_user,'user');
+	Giraf::Trigger::register('public_function','core','bot_admin_module',\&bot_admin_module,'module');
+	Giraf::Trigger::register('public_function','core','bot_register',\&bot_register_user,'register');
 
 	Giraf::Admin::module_authorized_update();
 }
@@ -107,7 +109,7 @@ sub bot_admin_main {
 	$sub_func=shift(@tmp);
 	$args="@tmp";
 
-	Giraf::Core::debug("admin main : sub_func=$sub_func");
+	Giraf::Core::debug("admin main : sub_func=$sub_func, args=$args");
 
 	switch ($sub_func)
 	{
@@ -131,7 +133,7 @@ sub bot_admin_module {
 	$sub_func=shift(@tmp);
 	$args="@tmp";
 
-	Giraf::Core::debug("admin module : sub_func=$sub_func");
+	Giraf::Core::debug("admin module : sub_func=$sub_func, args=$args");
 
 	switch ($sub_func)
 	{
