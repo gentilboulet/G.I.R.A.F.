@@ -364,6 +364,7 @@ sub bbcode
 		teal       => "10",
 		aqua_light => "11",
 		royal_blue => "12",
+		blue 	   => "12",
 		hot_pink   => "13",
 		dark_gray  => "14",
 		light_gray => "15",
