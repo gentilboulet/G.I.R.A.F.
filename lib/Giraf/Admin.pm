@@ -289,7 +289,7 @@ sub bot_ignore_user {
 	$who=shift(@tmp);
 	$permanent=shift(@tmp);
 	
-	if($permanent eq "1")
+	if(defined($permanent) && $permanent eq "1")
 	{
 		$permanent=1;
 	}
