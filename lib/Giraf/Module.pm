@@ -12,6 +12,8 @@ use Giraf::Trigger;
 
 use DBI;
 use Switch;
+use LWP::UserAgent;
+use XML::LibXML;
 
 # Public vars
 
@@ -22,10 +24,12 @@ our $_dbh;
 our $_tbl_modules = 'modules';
 our $_tbl_users = 'users';
 our $_tbl_config = 'config';
+our $_ua;
 
 sub mod_load {
 	my ($mod) = @_;
 	Giraf::Core::debug("Giraf::Module::mod_load($mod)");	
+	my ($err,$version);
 	eval ("require Giraf::Modules::$mod;");
 	return $@;
 }
@@ -33,7 +37,10 @@ sub mod_load {
 sub mod_run {
 	my ($mod, $fn, @args) = @_;
 	my $ret;
+	my $version;
 	Giraf::Core::debug("Giraf::Module::mod_run($mod)");
+	eval ('$version='.'$Giraf::Modules::' . $mod . '::version;');
+	set_version($mod,$version);
 	eval ('$ret = ' . '&Giraf::Modules::' . $mod . '::' . $fn . '(@args);');
 	return $ret;
 }
@@ -53,11 +60,11 @@ sub init {
 	my ($req);
 
 	Giraf::Core::debug("Giraf::Module::init()");
-	
+
 
 	$_dbh = Giraf::Admin::get_dbh();
 	$_dbh->do("BEGIN TRANSACTION");
-	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules (autorun NUMERIC, name TEXT PRIMARY KEY, loaded NUMERIC DEFAULT 0);");
+	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_modules (autorun NUMERIC, name TEXT PRIMARY KEY, loaded NUMERIC DEFAULT 0, version DEFAULT 1);");
 	# Mark all modules as not loaded
 	$_dbh->do("UPDATE $_tbl_modules SET loaded=0");
 	$_dbh->do("COMMIT");
@@ -87,6 +94,13 @@ sub init {
 			}
 		}
 	}
+
+	if(!$_ua)
+	{
+		$_ua=LWP::UserAgent->new;
+	}
+
+
 
 }
 
@@ -141,7 +155,7 @@ sub bot_module_main {
 
 	switch ($sub_func)
 	{
-		case 'available' 	{	push(@return,bot_available_module($nick,$dest,$args)); }
+		case 'available'{	push(@return,bot_available_module($nick,$dest,$args)); }
 		case 'list' 	{	push(@return,bot_list_module($nick,$dest,$args)); }
 		case 'add'	{	push(@return,bot_add_module($nick,$dest,$args)); }
 		case 'del'	{	push(@return,bot_del_module($nick,$dest,$args)); }
@@ -149,6 +163,7 @@ sub bot_module_main {
 		case 'set'	{	push(@return,bot_set_module($nick,$dest,$args)); }
 		case 'unload'	{	push(@return,bot_unload_module($nick,$dest,$args)); }
 		case 'reload'	{	push(@return,bot_reload_modules($nick,$dest,$args)); }
+		case 'install'  {	push(@return,bot_install_module($nick,$dest,$args)); }
 	}
 
 	return @return;
@@ -278,8 +293,7 @@ sub bot_add_module {
 			my $file="$name.pm";
 			if( -e "lib/Giraf/Modules/".$file )
 			{
-				my $sth=$_dbh->prepare("INSERT INTO $_tbl_modules (name,autorun) VALUES (?,?)");
-				$sth->execute($name,$autorun);
+				add_module($name,$autorun);
 				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] ajoute !'};
 				push(@return,$ligne);
 			}
@@ -338,14 +352,14 @@ sub bot_list_module {
 
 	Giraf::Core::debug("Giraf::Module::bot_list_module()");
 
-	my $sth=$_dbh->prepare("SELECT name,autorun,loaded FROM $_tbl_modules");
+	my $sth=$_dbh->prepare("SELECT name,autorun,loaded,version FROM $_tbl_modules");
 	my @return;
-	my ($module_name,$autorun,$loaded);
-	$sth->bind_columns( \$module_name, \$autorun, \$loaded);
+	my ($module_name,$autorun,$loaded,$version);
+	$sth->bind_columns( \$module_name, \$autorun, \$loaded, \$version);
 	$sth->execute();
 	while($sth->fetch())
 	{
-		my $ligne= {action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] : autorun=[color=orange]'.$autorun.'[/color];loaded=[c=teal]'.$loaded.'[/c];enabled on [c=green]'.$dest.'[/c]=[c=red]'.(0+Giraf::Admin::module_authorized($module_name,$dest)).'[/c]'};
+		my $ligne= {action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] : autorun=[color=orange]'.$autorun.'[/color]; loaded=[c=teal]'.$loaded.'[/c]; enabled on [c=green]'.$dest.'[/c]=[c=red]'.(0+Giraf::Admin::module_authorized($module_name,$dest)).'[/c]; version=[c=bleu]'.$version.'[/c]'};
 		push(@return,$ligne);
 	}
 	return @return
@@ -402,7 +416,7 @@ sub bot_set_module {
 			{
 				case 'autorun'	{$tbl_param='autorun'}
 				else 		{ 
-					my $ligne=={ action =>"MSG",dest=>$dest,msg=>'Parametre [c=red]'.$param.'[/c] incorrect !'};
+					my $ligne={ action =>"MSG",dest=>$dest,msg=>'Parametre [c=red]'.$param.'[/c] incorrect !'};
 					push(@return,$ligne);
 					return @return;
 						}
@@ -430,38 +444,191 @@ sub bot_set_module {
 	return @return
 }
 
-sub modules_on_quit {
+sub bot_install_module {
+	my ($nick,$dest,$what) = @_;
 	
+	Giraf::Core::debug("Giraf::Module::bot_install_module($what)");
+	
+	my @return;
+
+	my ($list_url,$request,$modules);
+	
+	$list_url=Giraf::Config::get('modweblist');
+	$request=$_ua->get($list_url);
+	if($request->is_success)
+	{
+		my ($data,$parser,$doc);
+		$data=$request->content;
+		$parser = XML::LibXML->new();
+		$doc    = $parser->parse_string($data);
+		foreach my $mod ($doc->findnodes('/module_list/module'))
+		{
+			my ($name,$version,$url_root,@files,@sqls);
+			$name=$mod->findvalue('./name');
+			$version=$mod->findvalue('./version');
+			$url_root=$mod->findvalue('./url_root');
+			@files=();
+			@sqls=();
+			foreach my $file ($mod->findnodes('./file'))
+			{
+				push(@files,$file->to_literal);
+			}
+			foreach my $sql ($mod->findnodes('./sql'))
+			{
+				push(@sqls,$sql->to_literal);
+			}
+			$modules->{$name}={
+				version=>$version,
+				url=>$url_root,
+				files=>\@files,
+				sqls=>\@sqls,
+			}
+		}
+	}
+
+	my @tmp=split(/\s+/,$what);
+	my $mod=shift(@tmp);
+
+	if(defined($modules->{$mod}) && $modules->{$mod} && Giraf::Admin::is_user_admin($nick))
+	{
+		if(module_exists($mod))
+		{
+			my $ligne;
+			if(module_loaded($mod))
+			{
+				$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$mod.'[/c] encore chargé ! impossible de le réinstaller'};
+			}
+			else
+			{
+				$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$mod.'[/c] encore présent ! impossible de le réinstaller'};
+			}
+			push(@return,$ligne);
+		}
+		else
+		{
+
+			my @files=@{$modules->{$mod}->{files}};
+			my @sqls=@{$modules->{$mod}->{sqls}};
+			my $url=$modules->{$mod}->{url};
+			my $success=1;
+			my $nb_files=0;
+			foreach my $f (@files) 
+			{
+				if($f)
+				{
+					Giraf::Core::debug($f);
+					$nb_files++;
+					my $request=$_ua->get($url.'/'.$f);
+					if($request->is_success)
+					{
+						open(MODFILE, '>'.'./lib/Giraf/Modules/'.$f);
+						print MODFILE $request->content;
+						close(MODFILE);
+					}
+					else
+					{
+						$success=$success*0;
+					}
+				}
+			}
+			foreach my $s (@sqls)
+			{
+				if($s)
+				{
+					Giraf::Core::debug($s);
+					$nb_files++;
+					my $request=$_ua->get($url.'/'.$s);
+					if($request->is_success)
+					{
+						open(MODSQL, '>'.'./sql/'.$s);
+						print MODSQL $request->content;
+						close(MODSQL);
+						$_dbh->do($request->content);
+					}
+					else
+					{
+						$success=$success*0;
+					}
+				}
+
+			}
+			Giraf::Core::debug("nb_files=".$nb_files.";sucess=$success;");
+			my $ligne;
+			if($success*$nb_files)
+			{
+				foreach my $s (@sqls)
+				{
+					if($s)
+					{
+						open(MODSQL, './sql/'.$s);
+						while(my $l=<MODSQL>)
+						{
+							$_dbh->do($l);
+						}
+					}
+				}
+				add_module($mod,1);
+				$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$mod.'[/c] (version : '.$modules->{$mod}->{version}.') install !'};
+			}
+			else
+			{
+				foreach my $f (@files)
+				{
+					unlink('./lib/Giraf/Modules/'.$f);
+				}
+				foreach my $s (@sqls)
+				{
+					unlink('./sql/'.$s);
+				}
+				$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$mod.'[/c] (version : '.$modules->{$mod}->{version}.') pas install ! (broken ?)'};
+			}
+			push(@return,$ligne);
+		}
+	}
+	else
+	{
+		foreach my $module (keys %$modules)
+		{
+			my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module.'[/c] (version : '.$modules->{$module}->{version}.') disponible !'};
+			push(@return,$ligne);
+		}
+	}
+
+	return @return;
+}
+
+sub modules_on_quit {
+
 	Giraf::Core::debug("Giraf::Module::modules_on_quit()");
-        
+
 	my ($module,$module_name,$sth);
 
-        Giraf::Core::set_quit();
+	Giraf::Core::set_quit();
 
-        $sth=$_dbh->prepare("SELECT name FROM $_tbl_modules WHERE loaded=1");
-        $sth->bind_columns( \$module_name);
-        $sth->execute();
+	$sth=$_dbh->prepare("SELECT name FROM $_tbl_modules WHERE loaded=1");
+	$sth->bind_columns( \$module_name);
+	$sth->execute();
 
-        while($sth->fetch())
-        {
-                my $err = mod_load($module_name);       # XXX: why ??
-                mod_mark_loaded($module_name, 0);
-                mod_run($module_name, 'unload');
-                mod_run($module_name, 'quit');
-        }
+	while($sth->fetch())
+	{
+		my $err = mod_load($module_name);       # XXX: why ??
+		mod_mark_loaded($module_name, 0);
+		mod_run($module_name, 'unload');
+		mod_run($module_name, 'quit');
+	}
 
-        return 0;
+	return 0;
 
 }
 
 #Utility subs
 sub module_exists {
 	my ($module_name) = @_;
-	
+
 	Giraf::Core::debug("Giraf::Module::module_exists($module_name)");
 
 	my ($count,$exact_name,$sth);
-	
+
 	$sth=$_dbh->prepare("SELECT COUNT(*),name FROM $_tbl_modules WHERE name LIKE ?");
 	$sth->bind_columns( \$count , \$exact_name );
 	$sth->execute($module_name);
@@ -474,6 +641,28 @@ sub module_exists {
 	{
 		return $count;
 	}
+}
+
+sub module_version {
+	my ($module_name) = @_;
+	Giraf::Core::debug("Giraf::Module::module_version($module_name)");
+	my ($version,$sth);
+	$sth=$_dbh->prepare("SELECT version FROM $_tbl_modules WHERE name LIKE ?");
+	$sth->bind_columns(\$version);
+	$sth->execute($module_name);
+	return $version;
+}
+
+sub add_module {
+	my ($name,$autorun) = @_;
+	my $sth=$_dbh->prepare("INSERT INTO $_tbl_modules (name,autorun) VALUES (?,?)");
+	$sth->execute($name,$autorun);
+}
+
+sub set_version {
+	my ($name,$version) = @_;
+	my $sth=$_dbh->prepare("UPDATE $_tbl_modules SET version=? WHERE name LIKE ?");
+	return $sth->execute($version,$name);
 }
 
 sub module_loaded {
