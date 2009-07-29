@@ -12,6 +12,8 @@ use Giraf::Admin;
 use POSIX qw(ceil floor);
 use List::Util qw(min sum);
 
+our $version=1;
+
 sub init {
   my ($kernel,$irc) = @_;
   Giraf::Trigger::register('public_function','Gygax','bot_gygax',\&bot_gygax,'gygax');

@@ -12,6 +12,7 @@ use Giraf::Config;
 use DBI;
 use List::Util qw[min max];
 
+our $version=1;
 # Private vars
 our $_dbh;
 our $_tbl_urls = 'mod_urls_urls';

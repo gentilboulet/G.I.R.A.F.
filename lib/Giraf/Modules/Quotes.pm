@@ -10,6 +10,7 @@ use Giraf::Config;
 
 use DBI;
 
+our $version=1;
 # Private vars
 our $_dbh;
 our $_tbl_quote = 'mod_quotes_quote';

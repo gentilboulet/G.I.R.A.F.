@@ -11,6 +11,8 @@ use Giraf::Admin;
 
 use List::Util qw(sum);
 
+our $version=1;
+
 sub init {
 	my ($kernel,$irc) = @_;
 	Giraf::Trigger::register('public_function','LicheDice','bot_liche_dice',\&bot_liche_dice,'[Ll]iche');

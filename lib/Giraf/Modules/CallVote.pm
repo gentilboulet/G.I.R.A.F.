@@ -12,6 +12,7 @@ use List::Util qw[min max];
 use POE;
 use Switch;
 
+our $version=1;
 # Private vars
 our $_kernel;
 our $_votes;

@@ -9,6 +9,8 @@ use warnings;
 use Giraf::Admin;
 use Giraf::Config;
 
+our $version=1;
+
 sub init {
 	my ($kernel,$irc) = @_;
 	Giraf::Trigger::register('public_function','Dice','dice_main',\&bot_roll_dice,'dice');
