@@ -366,6 +366,7 @@ sub bbcode
 		royal_blue => "12",
 		blue 	   => "12",
 		hot_pink   => "13",
+		pink   	   => "13",
 		dark_gray  => "14",
 		light_gray => "15",
 		white      => "16",
