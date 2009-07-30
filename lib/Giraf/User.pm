@@ -162,9 +162,10 @@ sub user_register {
 		my $data=getDataFromNick($nick);
 		$UUID=$nick.'{'.$data->{hostmask}.'}';
 		$sth=$_dbh->prepare("INSERT INTO $_tbl_users (nick,hostmask,UUID) VALUES (?,?,?)");
-		$sth->execute($nick,$data->{hostmask},$data->{uuid});
+		$sth->execute($nick,$data->{hostmask},$UUID);
+		return 1;
 	}
-	return 1;
+	return 0;
 }
 
 sub user_ignore {
@@ -213,6 +214,7 @@ sub user_update_privileges {
 	{
 		my $sth=$_dbh->prepare("UPDATE $_tbl_users SET privileges=? WHERE UUID LIKE ?");
 		return $sth->execute($num,$uuid);
+		return 1;
 	}
 	else
 	{
