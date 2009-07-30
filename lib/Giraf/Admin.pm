@@ -164,6 +164,7 @@ sub bot_admin_user {
 		case 'unignore'	{       push(@return,bot_unignore_user($nick,$dest,$args)); 	}
 		case 'promote'	{	push(@return,bot_promote_user($nick,$dest,$args));	}
 		case 'demote'	{	push(@return,bot_demote_user($nick,$dest,$args));	}
+		case 'status'	{	push(@return,bot_status_user($nick,$dest,$args));	}
 	}
 
 	return @return;
@@ -266,13 +267,20 @@ sub bot_register_user {
 
 	my @return;
 	my $ligne;
-	if(Giraf::User::user_register($nick))
+	if(!Giraf::Admin::is_user_registered($nick))
 	{
-		$ligne={ action =>"MSG",dest=>$dest,msg=>'Utilisateur [c=red]'.Giraf::User::getUUID($nick).'[/c] enregistré !'};
+		if(Giraf::User::user_register($nick))
+		{
+			$ligne={ action =>"MSG",dest=>$dest,msg=>'Utilisateur [c=red]'.Giraf::User::getUUID($nick).'[/c] enregistré !'};
+		}
+		else
+		{
+			$ligne={ action =>"MSG",dest=>$dest,msg=>'Impossible d\'enregistrer [c=red]'.Giraf::User::getUUID($nick).'[/c] !'};
+		}
 	}
 	else
 	{
-		$ligne={ action =>"MSG",dest=>$dest,msg=>'Impossible d\'enregistrer [c=red]'.Giraf::User::getUUID($nick).'[/c] !'};
+			$ligne={ action =>"MSG",dest=>$dest,msg=>'Impossible de se ré-enregistrer [c=red]'.$nick.'[/c] !'};
 	}
 	push(@return,$ligne);	
 	return @return;
@@ -285,10 +293,10 @@ sub bot_ignore_user {
 
 	my (@return, $ligne, @tmp, $who, $permanent);
 	@tmp=split(/\s+/,$args);
-	
+
 	$who=shift(@tmp);
 	$permanent=shift(@tmp);
-	
+
 	if(defined($permanent) && $permanent eq "1")
 	{
 		$permanent=1;
@@ -299,7 +307,7 @@ sub bot_ignore_user {
 	}
 
 	Giraf::Core::debug("bot_ignore_user who=$who, perma=$permanent");
-	
+
 	if(Giraf::Admin::is_user_admin($nick) )
 	{
 		if(Giraf::User::user_ignore($who,$permanent))
@@ -344,7 +352,9 @@ sub bot_demote_user {
 	@tmp=split(/\s+/,$args);
 	$who=shift(@tmp);
 	Giraf::Core::debug("bot_demote_user who=$who");
-	if( Giraf::Admin::is_user_admin($nick) && !Giraf::Admin::is_user_botadmin($who) )
+	if( 	(Giraf::Admin::is_user_admin($nick) && !Giraf::Admin::is_user_botadmin($who)) || 
+		(Giraf::Admin::is_user_botadmin($nick) && $nick eq Giraf::Config::get('botadmin') && $who ne Giraf::Config::get('botadmin')) 
+	)
 	{
 		if(Giraf::User::user_update_privileges($who,0))
 		{
@@ -354,12 +364,20 @@ sub bot_demote_user {
 				my $sth=$_dbh->prepare("DELETE FROM $_tbl_chan_admin WHERE user_UUID LIKE ?");
 				$sth->execute($uuid);
 			}
-			$ligne={action => "MSG", dest=>$dest,msg=>"Utilisateur [c=red]".$who."[/c] rétrogradé !"};
+			else
+			{
+
+				$ligne={action => "MSG", dest=>$dest,msg=>"Utilisateur [c=red]".$who."[/c] rétrogradé !"};
+			}
 		}
 		else
 		{
-			$ligne={action => "MSG", dest=>$dest,msg=>"Impossible de retrograder [c=red]".$who."[/c]"};
+			$ligne={action => "MSG", dest=>$dest,msg=>"Impossible de retrograder [c=red]".$who."[/c] (bug?)"};
 		}
+	}
+	else
+	{
+		$ligne={action => "MSG", dest=>$dest,msg=>"Impossible de retrograder [c=red]".$who."[/c]"};
 	}
 	push(@return,$ligne);
 	return @return;
@@ -380,38 +398,44 @@ sub bot_promote_user {
 		case 'botadmin' 	{ 
 			if( Giraf::Admin::is_user_botadmin($nick) && !Giraf::Admin::is_user_botadmin($who) ) 
 			{
-				Giraf::User::user_register($who);
-				if(Giraf::User::user_update_privileges($who,'botadmin'))
+				if(Giraf::Admin::is_user_registered($who))
 				{
-					$ok=1;
+					if(Giraf::User::user_update_privileges($who,'botadmin'))
+					{
+						$ok=1;
+					}
 				}
 			}
 		}
 		case 'admin'		{ 	
 			if( Giraf::Admin::is_user_botadmin($nick) && !Giraf::Admin::is_user_admin($who) )
 			{
-				Giraf::User::user_register($who);
-				if(Giraf::User::user_update_privileges($who,'admin'))
+				if(Giraf::Admin::is_user_registered($who))
 				{
-					$ok=1;
+					if(Giraf::User::user_update_privileges($who,'admin'))
+					{
+						$ok=1;
+					}
 				}
 			}
 		}
 		case 'chan_admin'	{ 
-						my $chan=shift(@tmp);
-						if( Giraf::Admin::is_user_admin($nick) && !Giraf::Admin::is_user_chan_admin($who,$chan) && Giraf::Chan::is_chan_known($chan) )
-						{
-							Giraf::User::user_register($who);
-							my $uuid=Giraf::User::getUUID($who);
-							my $sth=$_dbh->prepare("INSERT INTO $_tbl_chan_admin (chan_name,user_UUID) VALUES (?,?)");
-							if( Giraf::User::user_update_privileges($who,'chan_admin') && $sth->execute($chan,$uuid) )
-							{
-								$ok=1;
-							}
-
-						}
-						$level="$level de $chan";
+			my $chan=shift(@tmp);
+			if( Giraf::Admin::is_user_admin($nick) && !Giraf::Admin::is_user_chan_admin($who,$chan) && Giraf::Chan::is_chan_known($chan) )
+			{
+				if(Giraf::Admin::is_user_registered($who))
+				{
+					my $uuid=Giraf::User::getUUID($who);
+					my $sth=$_dbh->prepare("INSERT INTO $_tbl_chan_admin (chan_name,user_UUID) VALUES (?,?)");
+					if( Giraf::User::user_update_privileges($who,'chan_admin') && $sth->execute($chan,$uuid) )
+					{
+						$ok=1;
 					}
+				}
+
+			}
+			$level="$level de $chan";
+		}
 		else			{ return @return }
 	}
 
@@ -423,6 +447,55 @@ sub bot_promote_user {
 	{
 		$ligne={action=>"MSG",dest=>$dest,msg=>"[c=red]".$who."[/c] promu $level !"};
 	}
+	push(@return,$ligne);
+	return @return;
+}
+
+sub bot_status_user {
+	my ($nick,$dest,$args) = @_;
+	my (@return,$ligne);
+
+	if( $args)
+	{
+		$nick=$args;
+	}
+
+	Giraf::Core::debug("Giraf::Admin::bot_status_user($nick)");
+
+	my $uuid=Giraf::User::getUUID($nick);
+	if(is_user_registered($nick))
+	{
+		if(is_user_botadmin($nick))
+		{
+			$ligne={action=>'MSG',dest=>$dest,msg=>'[c=red]'.$nick.'[/c] est botadmin (uuid = [c=green]'.$uuid.'[/c])'};
+
+		}
+		elsif(is_user_admin($nick))
+		{
+			$ligne={action=>'MSG',dest=>$dest,msg=>'[c=red]'.$nick.'[/c] est admin (uuid = [c=green]'.$uuid.'[/c])'};
+		}
+		elsif(Giraf::User::is_user_chan_admin($nick))
+		{
+			my ($sth,$chan,@chans);
+			$sth=$_dbh->prepare("SELECT chan_name FROM $_tbl_chan_admin WHERE user_UUID LIKE ?");
+			$sth->bind_columns(\$chan);
+			$sth->execute($uuid);
+			while($sth->fetch())
+			{
+				push(@chans,$chan);
+			}
+			$ligne={action=>'MSG',dest=>$dest,msg=>'[c=red]'.$nick.'[/c] est chan_admin pour le(s) chan(s) [c=blue]'.join('[/c] ; [c=blue]',@chans).'[/c] (uuid = [c=green]'.$uuid.'[/c])'};
+		}
+		else
+		{
+			$ligne={action=>'MSG',dest=>$dest,msg=>'[c=red]'.$nick.'[/c] est enregistré (uuid = [c=green]'.$uuid.'[/c])'};
+		}
+	}
+	else
+	{
+			$ligne={action=>'MSG',dest=>$dest,msg=>'[c=red]'.$nick.'[/c] n\'est pas enregistré (uuid = [c=green]'.$uuid.'[/c])'};
+	}
+
 	push(@return,$ligne);
 	return @return;
 }
@@ -448,7 +521,7 @@ sub is_user_chan_admin {
 	{
 		return 1;
 	}
-	else
+	elsif(Giraf::User::is_user_chan_admin($user))
 	{
 		$uuid=Giraf::User::getUUID($user);
 		$sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_chan_admin WHERE chan_name LIKE ? AND user_UUID LIKE ?"); 
@@ -456,6 +529,10 @@ sub is_user_chan_admin {
 		$sth->execute($chan,$uuid);
 		$sth->fetch();
 		return (0+$count);
+	}
+	else
+	{
+		return 0;
 	}
 }
 
