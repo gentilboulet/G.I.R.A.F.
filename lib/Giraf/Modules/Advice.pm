@@ -10,6 +10,7 @@ use Giraf::Admin;
 
 use DBI;
 
+our $version=1;
 # Private vars
 our $_dbh;
 our $_advices;
