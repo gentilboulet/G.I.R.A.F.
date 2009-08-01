@@ -190,8 +190,9 @@ sub public_msg
 				{
 					my $element = $module->{$func};
 					#First we check for triggers
-					if(my ($arg)=($what=~/^$_triggers(.*)$/))
+					if( $what=~/^$_triggers(.*)$/ )
 					{
+						my $arg=$+;#the last matched part
 						my $regex=$element->{regex};
 						if ( $arg =~/^$regex\s*(.*?)$/ )
 						{
@@ -226,7 +227,7 @@ sub private_msg
 {
 	my ( $nick, $who, $where, $what )=@_;
 
-	Giraf::Core::debug("Giraf::Trigger::private_msg($who,$what)");
+	Giraf::Core::debug("Giraf::Trigger::private_msg($nick,$who,$what,$where)");
 
 	my @return;
 	if(!Giraf::User::is_user_ignore($nick))
@@ -238,8 +239,9 @@ sub private_msg
 			{
 				my $element = $module->{$func};
 				#First we check for triggers
-				if(my ($arg)=($what=~/^$_triggers(.*)$/))
+				if( $what=~/^$_triggers(.*)$/ )
 				{
+					my $arg=$+;#the last matched part
 					my $regex=$element->{regex};
 					if ($arg =~/^$regex\s*(.*?)$/)
 					{
