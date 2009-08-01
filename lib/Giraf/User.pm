@@ -8,6 +8,7 @@ use warnings;
 
 use Switch;
 use Giraf::Admin;
+use Digest::MD5 qw(md5_hex);
 
 use DBI;	
 
@@ -34,7 +35,7 @@ sub init {
 
 	$_dbh = Giraf::Admin::get_dbh();
 	$_dbh->do("BEGIN TRANSACTION;");
-	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_users (nick TEXT UNIQUE, hostmask TEXT, UUID TEXT PRIMARY KEY, privileges NUMERIC DEFAULT 0)");
+	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_users (nick TEXT, hostmask TEXT, UUID TEXT, privileges NUMERIC DEFAULT 0,password_hash TEXT,linkkey TEXT, UNIQUE(nick,hostmask))");
 	$_dbh->do("DROP TABLE $_tbl_nick_history");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_nick_history (nick TEXT PRIMARY KEY, last_seen NUMERIC, hostmask TEXT, UUID TEXT)");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_ignores (UUID TEXT PRIMARY KEY, permanent NUMERIC)");
@@ -43,6 +44,176 @@ sub init {
 	
 	Giraf::Trigger::register('on_nick_function','core','bot_on_nick_change',\&bot_on_nick_change);
 	Giraf::Trigger::register('on_uuid_change_function','core','bot_on_uuid_change',\&bot_on_uuid_change);
+	Giraf::Trigger::register('private_function','core','bot_user_main',\&bot_user_main,'user');
+}
+
+
+sub bot_user_main {
+        my ($nick,$who,$what)=@_;
+
+        Giraf::Core::debug("Giraf::User::bot_user_main($what)");
+
+        my @return;
+        my ($sub_func,$args,@tmp);
+        @tmp=split(/\s+/,$what);
+        $sub_func=shift(@tmp);
+        $args="@tmp";
+
+        Giraf::Core::debug("user main : sub_func=$sub_func args=$args");
+
+        switch ($sub_func)
+        {
+                case 'link' 	{       push(@return,bot_link_user($nick,$args));     	}
+                case 'linkkey'  {       push(@return,bot_linkkey_user($nick,$args));      }
+                case 'identify' {       push(@return,bot_identify_user($nick,$args));     }
+                case 'password' {       push(@return,bot_password_user($nick,$args));  	}
+        }
+
+        return @return;
+}
+
+sub bot_link_user {
+	my ($nick,$what)=@_;
+	Giraf::Core::debug("Giraf::User::bot_link_user()");
+	my @return;
+	my $ligne;
+
+	if(is_user_registered($nick))
+	{
+		my @tmp=split(/\s+/,$what);
+		my $user=shift(@tmp);
+		my $host=shift(@tmp);
+		my $key=shift(@tmp);
+		my $data=getDataFromNick($nick);
+		my $sth=$_dbh->prepare("SELECT COUNT(*),uuid,privileges FROM $_tbl_users WHERE nick LIKE ? AND hostmask LIKE ? AND linkkey LIKE ?");
+		my ($count,$uuid,$privileges);
+		$sth->bind_columns(\$count,\$uuid,\$privileges);
+		$sth->execute($user,$host,$key);
+		$sth->fetch();
+		if($count>0)
+		{
+			$sth=$_dbh->prepare("UPDATE $_tbl_users SET UUID=?,privileges=? WHERE nick LIKE ? AND hostmask LIKE ? AND UUID LIKE ?");
+			if($sth->execute($uuid,$privileges,$data->{nick},$data->{hostmask},$data->{uuid}))
+			{
+				$ligne={action => "PRIVMSG",dest=>$nick,msg=>'Votre compte a bien été lié avec le compte '.$user.'@'.$host};
+				$sth=$_dbh->prepare("UPDATE $_tbl_users SET linkkey='' WHERE UUID LIKE ?");
+				$sth->execute($uuid);
+				Giraf::Core::emit(Giraf::Trigger::on_uuid_change($data->{uuid},$uuid));
+			}
+			else
+			{
+				$ligne={action => "PRIVMSG",dest=>$nick,msg=>'Impossible de se lier avec le compte '.$user.'@'.$host};
+			}
+		}
+		else
+		{
+			$ligne={ action =>"PRIVMSG",dest=>$nick,msg=>'Impossible de se lier avec le compte '.$user.'@'.$host};
+		}
+	}
+	else
+	{
+		$ligne={ action =>"PRIVMSG",dest=>$nick,msg=>'Votre devez d\'abord etre enregitré !'};
+	}
+
+	push(@return,$ligne);
+	return @return;
+}
+
+sub bot_linkkey_user {
+	my ($nick,$what)=@_;
+	Giraf::Core::debug("Giraf::User::bot_linkkey_user()");
+	my @return;
+	my $ligne;
+
+	if(is_user_registered($nick))
+	{
+		my @chars=('a'..'z','A'..'Z','0'..'9','_','$','!','@');
+		my $key="";
+		foreach(1..12)
+		{
+			$key=$key.$chars[rand @chars];
+		}
+		my $uuid=getUUID($nick);
+		my $sth=$_dbh->prepare("UPDATE $_tbl_users SET linkkey=? WHERE nick LIKE ? AND UUID LIKE ?");
+		if($sth->execute($key,$nick,$uuid) > 0)
+		{
+			$ligne={ action =>"PRIVMSG",dest=>$nick,msg=>'Votre linkkey est [c=red]'.$key.'[/c] pour le prochain link'};
+		}
+		else
+		{
+			$ligne={ action =>"PRIVMSG",dest=>$nick,msg=>'Impossible de generer une linkkey ? bug !'};
+		}
+	}
+	else	
+	{
+			$ligne={ action =>"PRIVMSG",dest=>$nick,msg=>'Votre devez d\'abord etre enregitré !'};
+	}
+	push(@return,$ligne);
+	return @return;
+}
+
+sub bot_password_user {
+	my ($nick,$what)=@_;
+	Giraf::Core::debug("Giraf::User::bot_password_user()");
+	my @return;
+	my $ligne;
+
+	if(is_user_registered($nick))
+	{
+		my $uuid=getUUID($nick);
+		my @tmp=split(/\s+/,$what);
+		my $pass=shift(@tmp);
+		my $hash=md5_hex($pass);
+		my $sth=$_dbh->prepare("UPDATE $_tbl_users SET password_hash=? WHERE UUID LIKE ?");
+		if($sth->execute($hash,$uuid)>0)
+		{
+			$ligne={ action => "PRIVMSG",dest=>$nick,msg=>'Le hash [c=red]'.$hash.'[/c] de votre password ('.$pass.') a bien ete enregistre !'};
+		}
+		else
+		{
+			$ligne={ action =>"PRIVMSG",dest=>$nick,msg=>'Impossible de rajouter le password pour votre user ? bug !'};
+		}
+	}
+	else
+	{
+		$ligne={ action =>"PRIVMSG",dest=>$nick,msg=>'Votre devez d\'abord etre enregitré !'};
+	}
+
+	push(@return,$ligne);
+	return @return;
+}
+
+sub bot_identify_user {
+	my ($nick,$what)=@_;
+	Giraf::Core::debug("Giraf::User::bot_identify_user()");
+	my @return;
+	my $ligne;
+
+	my @tmp=split(/\s+/,$what);
+	my $user=shift(@tmp);
+	my $host=shift(@tmp);
+	my $pass=shift(@tmp);
+	my $hash=md5_hex($pass);
+	my $data=getDataFromNick($nick);
+	my $sth=$_dbh->prepare("SELECT COUNT(*),uuid FROM $_tbl_users WHERE nick LIKE ? AND hostmask LIKE ? AND password_hash LIKE ?");
+	my ($count,$uuid);
+	$sth->bind_columns(\$count,\$uuid);
+	$sth->execute($user,$host,$hash);
+	$sth->fetch();
+	if($count>0)
+	{
+		$sth=$_dbh->prepare("UPDATE $_tbl_nick_history SET UUID=? WHERE UUID LIKE ?");
+		$sth->execute($uuid,$data->{uuid});
+		Giraf::Core::emit(Giraf::Trigger::on_uuid_change($data->{uuid},$uuid));
+		$ligne={ action => "PRIVMSG",dest=>$nick,msg=>'Vous etes maintenant connu en tant que [c=red]'.$user.'@'.$host.'[/c]'};
+	}
+	else
+	{
+		$ligne={ action => "PRIVMSG",dest=>$nick,msg=>'Impossible de vous identifier en tant que [c=red]'.$user.'@'.$host.'[/c]'};
+	}
+
+	push(@return,$ligne);
+	return @return;
 }
 
 sub bot_on_nick_change {
@@ -71,19 +242,19 @@ sub getDataFromNick {
 
 	my ($sth,$return,$uuid,$hostmask,$uuid_with_privileges);
 	$sth=$_dbh->prepare("SELECT hostmask,UUID FROM $_tbl_nick_history WHERE nick LIKE ? ORDER BY last_seen DESC");
-	$sth->bind_columns(\$hostmask,\$uuid);
-	$sth->execute($nick);
-	$sth->fetch();
+		$sth->bind_columns(\$hostmask,\$uuid);
+		$sth->execute($nick);
+		$sth->fetch();
 
-	$sth=$_dbh->prepare("SELECT UUID FROM $_tbl_users WHERE nick LIKE ? AND hostmask LIKE ?");
-	$sth->bind_columns(\$uuid_with_privileges);
-	$sth->execute($nick,$hostmask);
-	$sth->fetch();
-	if($uuid_with_privileges)
-	{
-		if($uuid ne $uuid_with_privileges)
+		$sth=$_dbh->prepare("SELECT UUID FROM $_tbl_users WHERE nick LIKE ? AND hostmask LIKE ?");
+		$sth->bind_columns(\$uuid_with_privileges);
+		$sth->execute($nick,$hostmask);
+		$sth->fetch();
+		if($uuid_with_privileges)
 		{
-			Giraf::Core::emit(Giraf::Trigger::on_uuid_change($uuid,$uuid_with_privileges));
+			if($uuid ne $uuid_with_privileges)
+			{
+				Giraf::Core::emit(Giraf::Trigger::on_uuid_change($uuid,$uuid_with_privileges));
 		}
 		$uuid=$uuid_with_privileges;	
 	}
