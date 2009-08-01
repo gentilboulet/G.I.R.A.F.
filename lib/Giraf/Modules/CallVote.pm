@@ -186,6 +186,7 @@ sub callvote_uuid_change {
 	foreach my $k (keys(%$_votes))
 	{
 		$_votes->{$k}->{votants}->{$uuid_new}=$_votes->{$k}->{votants}->{$uuid};
+		delete($_votes->{$k}->{votants}->{$uuid});
 	}
 	return;
 }
