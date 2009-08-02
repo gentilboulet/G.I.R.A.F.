@@ -97,20 +97,9 @@ sub roll_dice {
 	if($preliminaryroll<20) {
 		$res=1;
 	}
-	if(($preliminaryroll>=20) && ($preliminaryroll<40)) {
-		$res=int(rand($facenb)/16)+1;
-	}
-	if(($preliminaryroll>=40) && ($preliminaryroll<60)) {
-		$res=int(rand($facenb)/8)+1;
-	}
-	if(($preliminaryroll>=60) && ($preliminaryroll<80)) {
-		$res=int(rand($facenb)/4)+1;
-	}
-	if(($preliminaryroll>=80) && ($preliminaryroll<90)) {
-		$res=int(rand($facenb)/2)+1;
-	}
-	if($preliminaryroll>=90) {
-		$res=int(rand($facenb))+1;
+	else {
+		my $divisor = int(rand($facenb/2))+1;
+		$res = int(rand($facenb)/$divisor)+1;
 	}
 	return $res;
 }
