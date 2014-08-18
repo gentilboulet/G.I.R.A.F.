@@ -1,0 +1,8 @@
+<module_list>
+	<module>
+		<name>Weee</name>
+		<version>1</version>
+		<url_root>https://raw.githubusercontent.com/gentilboulet/G.I.R.A.F./0c93b54978e38b48cf351769e4e3a5e174abe950/lib/Giraf/Modules/</url_root>
+		<file>Weee.pm</file>
+	</module>
+</module_list>
