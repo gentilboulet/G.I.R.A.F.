@@ -209,6 +209,7 @@ sub init_session
 		# temporary ; may be deleted in the future ; DO NOT USE !
 		$_sessions_hash->{$session_alias}->{session_id}=$session_id;
 	}
+	return $_sessions_hash->{$session_alias}->{started} ;
 }
 
 sub shutdown_session
@@ -224,17 +225,17 @@ sub shutdown_session
 
 sub post_event
 {
-	my ($session_alias, $method, @args) = @_;
-	$_kernel->post($session_alias => $method => @args);
-	Giraf::Core::debug("Giraf::Session::post_event($session_alias, $method, (@args) );");
+	my ($session_alias, $event_name, @args) = @_;
+	$_kernel->post($session_alias => $event_name => @args);
+	Giraf::Core::debug("Giraf::Session::post_event($session_alias, $event_name, (@args) );");
 	return ;
 }
 
 sub call_event
 {
-	my ($session_alias, $method, @args) = @_;
-	Giraf::Core::debug("Giraf::Session::call_event($session_alias, $method, (@args) );");
-	return $_kernel->call($session_alias => $method => @args);
+	my ($session_alias, $event_name, @args) = @_;
+	Giraf::Core::debug("Giraf::Session::call_event($session_alias, $event_name, (@args) );");
+	return $_kernel->call($session_alias => $event_name => @args);
 }
 
 sub add_event
@@ -242,14 +243,14 @@ sub add_event
 	#eval du code passé en parametres
 	my ($session_alias, $event_name, $event_handler) = @_;
 	Giraf::Core::debug("Giraf::Session::add_event($session_alias, $event_name, $event_handler)");
-	post_event($session_alias, '_new_event', $event_name,$event_handler);		
+	call_event($session_alias, '_new_event', $event_name,$event_handler);		
 }
 
 sub rm_event
 {
 	my ($session_alias, $event_name) = @_;
 	Giraf::Core::debug("Giraf::Session::rm_event($session_alias, $event_name)");
-	post_event($session_alias, '_del_event', $event_name);
+	call_event($session_alias, '_del_event', $event_name);
 }
 
 sub set_delay_event
