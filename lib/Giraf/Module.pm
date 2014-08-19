@@ -13,7 +13,7 @@ use Giraf::Trigger;
 use DBI;
 use Switch;
 use LWP::UserAgent;
-use XML::LibXML;
+use Data::Dumper;
 
 # Public vars
 
@@ -459,24 +459,22 @@ sub bot_install_module {
 	{
 		my ($data,$parser,$doc);
 		$data=$request->content;
-		$parser = XML::LibXML->new();
-		$doc    = $parser->parse_string($data);
-		foreach my $mod ($doc->findnodes('/module_list/module'))
+		
+		$data=~s/\s//g;
+		$data=~/^<module_list>((.*)+)<\/module_list>$/;
+		my $module_list = $1;
+	
+		my (@modlist) = ($module_list =~/<module>(.+?)<\/module>/g);
+		foreach my $mod_data (@modlist)
 		{
 			my ($name,$version,$url_root,@files,@sqls);
-			$name=$mod->findvalue('./name');
-			$version=$mod->findvalue('./version');
-			$url_root=$mod->findvalue('./url_root');
-			@files=();
-			@sqls=();
-			foreach my $file ($mod->findnodes('./file'))
-			{
-				push(@files,$file->to_literal);
-			}
-			foreach my $sql ($mod->findnodes('./sql'))
-			{
-				push(@sqls,$sql->to_literal);
-			}
+			($name)= $mod_data=~/<name>(.+)<\/name>/;
+			($version)= $mod_data=~/<version>(.+)<\/version>/;
+			($url_root)= $mod_data=~/<url_root>(.+)<\/url_root>/;
+
+			@files= $mod_data=~/<file>(.+?)<\/file>/g;
+			@sqls= $mod_data=~/<sql>(.+?)<\/sql>/g;
+			
 			$modules->{$name}={
 				version=>$version,
 				url=>$url_root,
