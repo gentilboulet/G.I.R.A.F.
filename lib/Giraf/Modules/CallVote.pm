@@ -51,22 +51,15 @@ sub unload {
 }
 
 sub callvote_main {
-	my ($nick,$dest,$what)=@_;
+	my ($nick,$dest,$args)=@_;
 	my @return;
 	
 	Giraf::Core::debug("Giraf::Modules::CallVote::callvote_main()");
 	
-	my ($sub_func,$args);
-	$what=~m/((.+?)\??)\s+([0-9]+)?\s*$/;#To remove ending '?' to catch sub funcs
-	$sub_func=$2;
-	if($1 ne $2) { $args=$what;  }
-
-
-	switch ($sub_func)
-	{
-		case 'status'  	{       push(@return,callvote_status($nick,$dest)); }
-		else		{       if($args) { push(@return,callvote_launch($nick,$dest,$args));} }
-	}
+	if( $args =~/status/ )
+	{       push(@return,callvote_status($nick,$dest)); }
+	else
+	{       if($args) { push(@return,callvote_launch($nick,$dest,$args));} }
 
 	return @return;
 }
@@ -80,28 +73,39 @@ sub callvote_launch {
 	
 	if(! $_votes->{$dest}->{en_cours} )
 	{
-		my ($v)=$what=~/(\S.*?\S?)\s+\?/ ; #to detect a vote
-		my ($d)=$what=~/\S.*?\S?\s+\?\s+([0-9]+)?/; #To detect a delay
-		if($d)
+		my ($v)=$what=~/((\S+\s*)+)\s*\?/ ; #to detect a vote
+		if( $v ne "")
 		{
-			if($d<15)
+			$what=~/((\S+\s*)+)\s*\?\s+([0-9]+)?/; #To detect a delay
+			my $d = $3;
+	
+			if($d)
 			{
-				$d=15;
+				if($d<15)
+				{
+					$d=15;
+				}
+				$_votes->{$dest}->{delay}=min(300,$d);
 			}
-			$_votes->{$dest}->{delay}=min(300,$d);
+			else
+			{
+				$_votes->{$dest}->{delay}=60;
+			}
+			$_votes->{$dest}->{en_cours}=1;
+			$_votes->{$dest}->{question}="$v ?";
+			$_votes->{$dest}->{oui}=0;
+			$_votes->{$dest}->{non}=0;
+			$_votes->{$dest}->{delay_id}=0;
+			$_votes->{$dest}->{votants}={};
+			$_votes->{$dest}->{start_ts}=time();
+			Giraf::Session::post_event('callvote_core','vote_start', $dest, $v);
 		}
 		else
 		{
-			$_votes->{$dest}->{delay}=60;
+			my $ligne={ action =>"MSG",dest=>$dest,msg=>"Callvote : demande \"$what\" rejetee !"};
+			delete( $_votes->{$dest} );
+			push(@return,$ligne);
 		}
-		$_votes->{$dest}->{en_cours}=1;
-		$_votes->{$dest}->{question}="$v ?";
-		$_votes->{$dest}->{oui}=0;
-		$_votes->{$dest}->{non}=0;
-		$_votes->{$dest}->{delay_id}=0;
-		$_votes->{$dest}->{votants}={};
-		$_votes->{$dest}->{start_ts}=time();
-		Giraf::Session::post_event('callvote_core','vote_start', $dest, $v);
 	}
 	else
 	{
@@ -120,7 +124,7 @@ sub callvote_vote {
 	Giraf::Core::debug("Giraf::Modules::CallVote::callvote_vote($nick,$dest,$what)");
 	my $uuid=Giraf::User::getUUID($nick);
 
-	if($_votes->{$dest}->{en_cours} && $what=~/[12]/ ) 
+	if($_votes->{$dest}->{en_cours} && $what=~/[0-9]+/ ) 
 	{
 		if( ! $_votes->{$dest}->{votants}->{$uuid} )
 		{

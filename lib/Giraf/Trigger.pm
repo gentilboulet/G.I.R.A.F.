@@ -38,7 +38,7 @@ sub init {
 	$_irc     = $irc_session;
 	$_triggers=$set_triggers;
 
-	Giraf::Core::debug("Giraf::Trigger::init()");
+	Giraf::Core::_debug("Giraf::Trigger::init()",1);
 
 }
 
@@ -46,7 +46,7 @@ sub init {
 sub on_part {
 	my ( $nick, $channel ) = @_;
 
-	Giraf::Core::debug("Giraf::Trigger::on_part($nick,$channel)");
+	Giraf::Core::_debug("Giraf::Trigger::on_part($nick,$channel)",3);
 
 	my @return;
 	foreach my $module_name (keys %$_on_part_functions)
@@ -63,7 +63,7 @@ sub on_part {
 sub on_quit {
 	my ( $nick, $message) = @_;
 
-	Giraf::Core::debug("Giraf::Trigger::on_quit($nick,$message)");
+	Giraf::Core::_debug("Giraf::Trigger::on_quit($nick,$message)",3);
 
 	my @return;
 	foreach my $module_name (keys %$_on_quit_functions)
@@ -80,7 +80,7 @@ sub on_quit {
 sub on_nick {
 	my ( $nick, $nick_new ) = @_;
 
-	Giraf::Core::debug("Giraf::Trigger::on_nick($nick,$nick_new)");
+	Giraf::Core::_debug("Giraf::Trigger::on_nick($nick,$nick_new)",3);
 
 	my @return;
 	foreach my $module_name (keys %$_on_nick_functions)
@@ -98,7 +98,7 @@ sub on_nick {
 sub on_kick {
         my ( $kicked, $channel, $kicker, $reason ) = @_;
 
-        Giraf::Core::debug("Giraf::Trigger::on_kick($kicked, $channel, $kicker, $reason)");
+        Giraf::Core::_debug("Giraf::Trigger::on_kick($kicked, $channel, $kicker, $reason)",3);
 
         my @return;
         foreach my $module_name (keys %$_on_kick_functions)
@@ -122,7 +122,7 @@ sub on_kick {
 sub on_uuid_change {
 	my ( $uuid, $uuid_new ) = @_;
 
-	Giraf::Core::debug("Giraf::Trigger::on_uuid_change($uuid,$uuid_new)");
+	Giraf::Core::_debug("Giraf::Trigger::on_uuid_change($uuid,$uuid_new)",3);
 
 	my @return;
 	foreach my $module_name (keys %$_on_uuid_change_functions)
@@ -141,7 +141,7 @@ sub on_uuid_change {
 sub on_join {
 	my ( $nick, $channel ) = @_;
 
-	Giraf::Core::debug("Giraf::Trigger::on_join($nick,$channel)");
+	Giraf::Core::_debug("Giraf::Trigger::on_join($nick,$channel)",3);
 
 	my @return;
 	foreach my $module_name (keys %$_on_join_functions)
@@ -165,7 +165,7 @@ sub on_bot_quit {
 
 	Giraf::Core::set_quit();
 
-	Giraf::Core::debug("Giraf::Trigger::on_bot_quit($reason)");
+	Giraf::Core::_debug("Giraf::Trigger::on_bot_quit($reason)",3);
 
 	Giraf::Module::modules_on_quit();
 
@@ -178,6 +178,7 @@ sub on_bot_quit {
 sub public_msg
 {
 	my ( $nick, $channel, $what )=@_;
+	Giraf::Core::_debug("Giraf::Trigger::public_msg($nick,$channel,$what)",2);
 	my @return;
 	if(!Giraf::User::is_user_ignore($nick))
 	{
@@ -227,7 +228,7 @@ sub private_msg
 {
 	my ( $nick, $who, $where, $what )=@_;
 
-	Giraf::Core::debug("Giraf::Trigger::private_msg($nick,$who,$what,$where)");
+	Giraf::Core::_debug("Giraf::Trigger::private_msg($nick,$who,$what,$where)",2);
 
 	my @return;
 	if(!Giraf::User::is_user_ignore($nick))
@@ -272,7 +273,7 @@ sub private_msg
 sub register {
 	my ($where_to_register,$module_name,$function_name,$function,$regex)=@_;
 
-	Giraf::Core::debug("Giraf::Trigger::register($where_to_register,$module_name,$function_name,$function)");
+	Giraf::Core::_debug("Giraf::Trigger::register($where_to_register,$module_name,$function_name,$function)",1);
 
 	if( $module_name eq 'core' || Giraf::Module::module_exists($module_name) )
 	{
@@ -295,7 +296,7 @@ sub register {
 sub unregister {
 	my ($where_to_register,$module_name,$function_name)=@_;
 
-	Giraf::Core::debug("Giraf::Trigger::unregister($where_to_register,$module_name,$function_name)");	
+	Giraf::Core::_debug("Giraf::Trigger::unregister($where_to_register,$module_name,$function_name)",1);	
 
 	if( $module_name eq 'core' || Giraf::Module::module_exists($module_name) )
 	{
