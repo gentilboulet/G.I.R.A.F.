@@ -314,7 +314,6 @@ sub new_events {
 
 sub start_session {
 	Giraf::Core::debug("Giraf::Modules::CallVote::start_session()");
-	$_kernel->post(callvote_core=>vote_new_events=>());
 	if(!$_session_started)
 	{
 		$_session_started=1;
@@ -330,9 +329,11 @@ sub start_session {
 				vote_clean_events => \&Giraf::Modules::CallVote::clean_events,
 				vote_new_events => \&Giraf::Modules::CallVote::new_events,
 			},
+			options => { trace => 1, debug => 1 }
 
 		);
 	}
+	$_kernel->post(callvote_core=>vote_new_events=>());
 }
 
 1;

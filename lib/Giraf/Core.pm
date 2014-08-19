@@ -9,6 +9,7 @@ use Giraf::Admin;
 use Giraf::User;
 use Giraf::Chan;
 use Giraf::Trigger;
+use Giraf::Session;
 
 use POSIX;
 use POE qw(Component::IRC);
@@ -45,6 +46,7 @@ sub run {
 		username => Giraf::Config::get('botuser'),
 		localaddr=> Giraf::Config::get('botbindip'),
 		UseSSL => Giraf::Config::get('ssl'),
+		debug => Giraf::Config::get('debug'),
 	  )
 	  or die "Oh noooo! $!";
 	
@@ -338,6 +340,7 @@ sub _start
 	Giraf::User::init( $kernel,  $irc ,$botname);
 	Giraf::Trigger::init( $kernel, $irc ,$triggers);
 	Giraf::Module::init( $kernel,  $irc);
+	Giraf::Session::init( $kernel, $irc);
 	$kernel->post ($irc_session =>  'privmsg' => nickserv => "IDENTIFY ".Giraf::Config::get('botpass'));
 	$kernel->sig( INT => "sigint" );
 }
@@ -397,8 +400,11 @@ sub bbcode
 	my $color     = "color|c";
 	my $bgcolor   = "bgcolor|bgc";
 	my $reverse   = "reverse|r";
-	foreach my $i (0..10)
+	my $msg_text_org;
+	do 
 	{
+		$msg_text_org=$msg_text;
+
 		#bold
 		$msg_text =~ s/\[($bold)\](.*?)\[\/($bold)\]/\002$2\002/gi;
 
@@ -416,13 +422,24 @@ sub bbcode
 		#reverse
 		$msg_text =~ s/\[($reverse)\](.*?)\[\/($reverse)\]/\026$2\026/gi;
 	}
+	while($msg_text_org ne $msg_text);
 	return $msg_text;
 }
 
 sub debug
 {
 	my ($text) = @_;
-	_log($text,Giraf::Config::get('debug'));
+	_log($text,Giraf::Config::get('debug') );
+	return $text;
+}
+
+sub _debug
+{
+	my ($text,$debug_level) = @_;
+	if( $debug_level > 0 && $debug_level <= Giraf::Config::get('debug_level') )
+	{
+		_log($text, Giraf::Config::get('debug') );
+	}
 	return $text;
 }
 

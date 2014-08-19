@@ -31,8 +31,6 @@ sub init {
 	$_kernel  = $ker;
 	$_irc     = $irc_session;
 
-	Giraf::Core::debug("Giraf::User::init()");
-
 	$_dbh = Giraf::Admin::get_dbh();
 	$_dbh->do("BEGIN TRANSACTION;");
 	$_dbh->do("CREATE TABLE IF NOT EXISTS $_tbl_users (nick TEXT, hostmask TEXT, UUID TEXT, privileges NUMERIC DEFAULT 0,password_hash TEXT,linkkey TEXT, UNIQUE(nick,hostmask))");
@@ -42,6 +40,8 @@ sub init {
 	$_dbh->do("DELETE FROM $_tbl_ignores WHERE permanent = 0");
 	$_dbh->do("COMMIT;");
 	
+	Giraf::Core::_debug("Giraf::User::init()",1);
+
 	Giraf::Trigger::register('on_nick_function','core','bot_on_nick_change',\&bot_on_nick_change);
 	Giraf::Trigger::register('on_uuid_change_function','core','bot_on_uuid_change',\&bot_on_uuid_change);
 	Giraf::Trigger::register('private_function','core','bot_user_main',\&bot_user_main,'user');
@@ -51,7 +51,7 @@ sub init {
 sub bot_user_main {
         my ($nick,$who,$what)=@_;
 
-        Giraf::Core::debug("Giraf::User::bot_user_main($what)");
+        Giraf::Core::_debug("Giraf::User::bot_user_main()",1);
 
         my @return;
         my ($sub_func,$args,@tmp);
@@ -59,7 +59,7 @@ sub bot_user_main {
         $sub_func=shift(@tmp);
         $args="@tmp";
 
-        Giraf::Core::debug("user main : sub_func=$sub_func args=$args");
+        Giraf::Core::_debug("user main : sub_func=$sub_func",2);
 
         switch ($sub_func)
         {
@@ -74,7 +74,7 @@ sub bot_user_main {
 
 sub bot_link_user {
 	my ($nick,$what)=@_;
-	Giraf::Core::debug("Giraf::User::bot_link_user()");
+	Giraf::Core::_debug("Giraf::User::bot_link_user()",2);
 	my @return;
 	my $ligne;
 
@@ -121,7 +121,7 @@ sub bot_link_user {
 
 sub bot_linkkey_user {
 	my ($nick,$what)=@_;
-	Giraf::Core::debug("Giraf::User::bot_linkkey_user()");
+	Giraf::Core::_debug("Giraf::User::bot_linkkey_user()",2);
 	my @return;
 	my $ligne;
 
@@ -154,7 +154,7 @@ sub bot_linkkey_user {
 
 sub bot_password_user {
 	my ($nick,$what)=@_;
-	Giraf::Core::debug("Giraf::User::bot_password_user()");
+	Giraf::Core::_debug("Giraf::User::bot_password_user()",2);
 	my @return;
 	my $ligne;
 
@@ -185,7 +185,7 @@ sub bot_password_user {
 
 sub bot_identify_user {
 	my ($nick,$what)=@_;
-	Giraf::Core::debug("Giraf::User::bot_identify_user()");
+	Giraf::Core::_debug("Giraf::User::bot_identify_user()",2);
 	my @return;
 	my $ligne;
 
@@ -219,7 +219,7 @@ sub bot_identify_user {
 sub bot_on_nick_change {
 	my ($old_nick,$new_nick) = @_;
 
-	Giraf::Core::debug("Giraf::User::bot_on_nick_change($old_nick,$new_nick)");
+	Giraf::Core::_debug("Giraf::User::bot_on_nick_change($old_nick,$new_nick)",2);
 
 	my @return;
 	my $infos=getDataFromNick($old_nick);
@@ -229,7 +229,7 @@ sub bot_on_nick_change {
 
 sub add_user_info {
 	my ( $nick,$hostmask) = @_;
-	Giraf::Core::debug("Giraf::User::add_user_info($nick,$hostmask)");
+	Giraf::Core::_debug("Giraf::User::add_user_info($nick,$hostmask)",3);
 	my $UUID=$nick.'{'.$hostmask.'}';
 	history_add($nick,$hostmask,$UUID);
 	return $UUID;
@@ -238,7 +238,7 @@ sub add_user_info {
 sub getDataFromNick {
 	my ($nick)=@_;
 
-	Giraf::Core::debug("Giraf::User::getDataFromNick($nick)");
+	Giraf::Core::_debug("Giraf::User::getDataFromNick($nick)",3);
 
 	my ($sth,$return,$uuid,$hostmask,$uuid_with_privileges);
 	$sth=$_dbh->prepare("SELECT hostmask,UUID FROM $_tbl_nick_history WHERE nick LIKE ? ORDER BY last_seen DESC");
@@ -267,13 +267,14 @@ sub bot_on_uuid_change {
 	my ($uuid,$uuid_new) = @_;
 	my @return;
 	my $sth=$_dbh->prepare("UPDATE $_tbl_nick_history SET UUID=? WHERE UUID LIKE ?");
+	Giraf::Core::_debug("Giraf::User::bot_on_nick_change($uuid,$uuid_new",3);
 	$sth->execute($uuid_new,$uuid);
 	return @return;
 }
 
 sub getUUID {
 	my ($nick)=@_;
-	Giraf::Core::debug("Giraf::User::getUUID($nick)");	
+	Giraf::Core::_debug("Giraf::User::getUUID($nick)",5);	
 	my $info=getDataFromNick($nick);
 	return $info->{uuid};
 }
@@ -281,7 +282,7 @@ sub getUUID {
 sub getNickFromUUID {
 	my ($uuid)=@_;
 
-	Giraf::Core::debug("Giraf::User::getNickFromUUID($uuid)");
+	Giraf::Core::_debug("Giraf::User::getNickFromUUID($uuid)",5);
 
 	my ($sth,$nick);
 	$sth=$_dbh->prepare("SELECT nick FROM $_tbl_nick_history WHERE UUID LIKE ? ORDER BY last_seen DESC");
@@ -294,7 +295,7 @@ sub getNickFromUUID {
 sub history_add {
 	my ($nick,$hostmask,$UUID) = @_;
 
-	Giraf::Core::debug("Giraf::User::history_add($nick,$hostmask,$UUID)");
+	Giraf::Core::_debug("Giraf::User::history_add($nick,$hostmask,$UUID)",3);
 
 	my ($sth,$uuid_with_privileges);
 	$sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_nick_history (nick,last_seen,UUID,hostmask) VALUES (?,?,?,?)");
@@ -319,14 +320,14 @@ sub history_add {
 
 sub user_register_botadmin {
 	my ($nick,$hostmask,$UUID) = @_;
-	Giraf::Core::debug("Giraf::User::user_register_botadmin($nick,$hostmask,$UUID)");
+	Giraf::Core::_debug("Giraf::User::user_register_botadmin($nick,$hostmask,$UUID)",4);
 	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_users (nick,hostmask,UUID,privileges) VALUES (?,?,?,10000)");
 	$sth->execute($nick,$hostmask,$nick.'{'.$hostmask.'}');
 }
 
 sub user_register {
 	my ($nick) = @_;
-	Giraf::Core::debug("Giraf::User::user_register($nick)");
+	Giraf::Core::_debug("Giraf::User::user_register($nick)",4);
 	if(!is_user_registered($nick))
 	{
 		my ($UUID,$sth);
@@ -341,7 +342,7 @@ sub user_register {
 
 sub user_ignore {
 	my ($nick,$perma) = @_;
-	Giraf::Core::debug("Giraf::User::user_ignore($nick,$perma)");
+	Giraf::Core::_debug("Giraf::User::user_ignore($nick,$perma)",4);
 	my ($UUID,$sth);
 	if(!Giraf::User::is_user_chan_admin($nick))
 	{
@@ -361,7 +362,7 @@ sub user_ignore {
 
 sub user_unignore {
 	my ($nick) = @_;
-	Giraf::Core::debug("Giraf::User::user_unignore($nick)");
+	Giraf::Core::_debug("Giraf::User::user_unignore($nick)",4);
 	my ($UUID,$sth);
 	$UUID=getUUID($nick);
 	$sth=$_dbh->prepare("DELETE FROM $_tbl_ignores WHERE uuid LIKE ?");
@@ -370,7 +371,7 @@ sub user_unignore {
 
 sub user_update_privileges {
 	my ($nick,$level) = @_;
-	Giraf::Core::debug("Giraf::User::user_update_privileges($nick,$level)");
+	Giraf::Core::_debug("Giraf::User::user_update_privileges($nick,$level)",4);
 	my $num=0;
 	switch($level) 
 	{
@@ -397,7 +398,7 @@ sub user_update_privileges {
 sub is_user_auth {
         my ($username,$level) = @_;
 
-	Giraf::Core::debug("Giraf::User::is_user_auth($username,$level)");
+	Giraf::Core::_debug("Giraf::User::is_user_auth($username,$level)",5);
 
 	my $data=getDataFromNick($username);
 	my ($count_nickhost,$count_uuid);
@@ -416,31 +417,31 @@ sub is_user_auth {
 
 sub is_user_botadmin {
 	my ($user) = @_;
-	Giraf::Core::debug("Giraf::User::is_user_botadmin($user)");
+	Giraf::Core::_debug("Giraf::User::is_user_botadmin($user)",5);
 	return is_user_auth($user,10000);
 }
 
 sub is_user_admin {
 	my ($user) = @_;
-	Giraf::Core::debug("Giraf::User::is_user_admin($user)");
+	Giraf::Core::_debug("Giraf::User::is_user_admin($user)",5);
 	return is_user_auth($user,1000);
 }
 
 sub is_user_chan_admin {
 	my ($user) = @_;
-	Giraf::Core::debug("Giraf::User::is_user_chan_admin($user)");
+	Giraf::Core::_debug("Giraf::User::is_user_chan_admin($user)",5);
 	return is_user_auth($user,100);
 }
 
 sub is_user_registered {
 	my ($user) = @_;
-	Giraf::Core::debug("Giraf::User::is_user_registered($user)");
+	Giraf::Core::_debug("Giraf::User::is_user_registered($user)",5);
 	return is_user_auth($user,0);
 }
 
 sub is_user_ignore {
 	my ($username) = @_;
-	Giraf::Core::debug("Giraf::User::is_user_ignore($username)");
+	Giraf::Core::_debug("Giraf::User::is_user_ignore($username)",5);
 	my ($ignore,$uuid,$sth);
 	$uuid=getUUID($username);
 	$sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_ignores WHERE UUID LIKE ?");

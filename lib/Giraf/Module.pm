@@ -28,7 +28,7 @@ our $_ua;
 
 sub mod_load {
 	my ($mod) = @_;
-	Giraf::Core::debug("Giraf::Module::mod_load($mod)");	
+	Giraf::Core::debug("Giraf::Module::mod_load($mod)");
 	my ($err,$version);
 	eval ("require Giraf::Modules::$mod;");
 	return $@;
@@ -38,7 +38,7 @@ sub mod_run {
 	my ($mod, $fn, @args) = @_;
 	my $ret;
 	my $version;
-	Giraf::Core::debug("Giraf::Module::mod_run($mod)");
+	Giraf::Core::debug("Giraf::Module::mod_run($mod,$fn)");
 	eval ('$version='.'$Giraf::Modules::' . $mod . '::version;');
 	set_version($mod,$version);
 	eval ('$ret = ' . '&Giraf::Modules::' . $mod . '::' . $fn . '(@args);');
@@ -425,7 +425,7 @@ sub bot_set_module {
 			{
 				my $sth=$_dbh->prepare("UPDATE modules SET ".$tbl_param."=? WHERE name LIKE ?");
 				$sth->execute($value,$name);
-				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] updaté ('.$param.'='.$value.') !'};
+				my $ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$name.'[/c] updaté ([c=cyan]'.$param.'[/c]=[c=yellow]'.$value.'[/c]) !'};
 				push(@return,$ligne);
 			}
 			else
