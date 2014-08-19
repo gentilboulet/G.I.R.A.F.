@@ -339,8 +339,8 @@ sub _start
 	Giraf::Chan::init( $kernel,  $irc ,$botname);
 	Giraf::User::init( $kernel,  $irc ,$botname);
 	Giraf::Trigger::init( $kernel, $irc ,$triggers);
-	Giraf::Module::init( $kernel,  $irc);
 	Giraf::Session::init( $kernel, $irc);
+	Giraf::Module::init( $kernel,  $irc);
 	$kernel->post ($irc_session =>  'privmsg' => nickserv => "IDENTIFY ".Giraf::Config::get('botpass'));
 	$kernel->sig( INT => "sigint" );
 }
