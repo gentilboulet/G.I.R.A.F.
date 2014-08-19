@@ -10,6 +10,7 @@ use Giraf::Admin;
 
 use LWP::UserAgent;
 
+our $version=1;
 # Private vars
 our $_dbh;
 our $_ua;

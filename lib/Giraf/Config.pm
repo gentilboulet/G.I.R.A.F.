@@ -18,7 +18,7 @@ sub load {
 		\%opts,       "help",       "server=s",   "serverpass=s",	"botpass=s",
 		"botnick=s",  "botuser=s",  "botrealnam=s",  			"botchan=s",		"botbindip=s",
 		"botident=s", "botmodes=s", "botopcmd=s", "maxtries=i",
-		"botadmin=s", "logfile=s",  "debug=i",	  "triggers=s", "ssl=i",
+		"botadmin=s", "logfile=s",  "debug=i",	 "debug_level=i", "triggers=s", "ssl=i",
 		"dbsrc=s", "dbuser=s", "dbpass=s"
 	  )
 	or return 0;

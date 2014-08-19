@@ -15,6 +15,7 @@ use POE;
 our $_dbh;
 our $_kernel;
 our $_irc;
+our $_session_launched=0;
 
 our $_tbl_chans='chans';
 
@@ -42,16 +43,7 @@ sub init {
 	}
 
 	Giraf::Trigger::register('on_kick_function','core','bot_on_kick',\&bot_on_kick);
-
-	POE::Session->create(
-		inline_states => {
-			_start => \&Giraf::Chan::chan_session_init,
-			_stop => \&Giraf::Chan::chan_session_stop,
-			launch_delayed_join => \&Giraf::Chan::launch_delayed_join,
-			delayed_join => \&Giraf::Chan::delayed_join,
-		},
-	);
-
+	launch_session();
 }
 
 sub join {
@@ -162,5 +154,18 @@ sub delayed_join {
 	}
 }
 
-
+sub launch_session {
+	if(!$_session_launched)
+	{
+		$_session_launched=1;
+		POE::Session->create(
+			inline_states => {
+				_start => \&Giraf::Chan::chan_session_init,
+				_stop => \&Giraf::Chan::chan_session_stop,
+				launch_delayed_join => \&Giraf::Chan::launch_delayed_join,
+				delayed_join => \&Giraf::Chan::delayed_join,
+			},
+		);
+	}
+}
 1;

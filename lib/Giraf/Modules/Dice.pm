@@ -9,22 +9,24 @@ use warnings;
 use Giraf::Admin;
 use Giraf::Config;
 
+our $version=1;
+
 sub init {
 	my ($kernel,$irc) = @_;
-	$Giraf::Admin::public_functions->{bot_roll_dice}={function=>\&bot_roll_dice,regex=>'dice (.*)'};
+	Giraf::Trigger::register('public_function','Dice','dice_main',\&bot_roll_dice,'dice');
 }
 
 sub unload {
-	delete($Giraf::Admin::public_functions->{bot_roll_dice});
+	Giraf::Trigger::unregister('public_function','Dice','dice_main');
+
 }
 
 
 sub bot_roll_dice {
 	my($nick, $dest, $what)=@_;
+	Giraf::Core::debug("bot_roll_dice($what)");
 	my @return;
-	my $regex= Giraf::Config::get('triggers')."dice (.*)";
-	my ($txt) = $what=~/$regex/ ;
-	my $ligne={ action =>"MSG",dest=>$dest,msg=>roll($txt,$nick)};
+	my $ligne={ action =>"MSG",dest=>$dest,msg=>roll($what,$nick)};
 	push(@return,$ligne);
 	return @return;
 }

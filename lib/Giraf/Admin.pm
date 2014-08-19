@@ -39,7 +39,7 @@ sub init {
 	$_irc     = $irc_session;
 	$_botname = $botname;
 
-	Giraf::Core::debug("Giraf::Admin::init()");
+	Giraf::Core::_debug("Giraf::Admin::init()",1);
 
 	$_tbl_users=$Giraf::User::_tbl_users;
 	$_tbl_chans=$Giraf::Chan::_tbl_chans;
@@ -55,7 +55,9 @@ sub init {
 	$_dbh->do("COMMIT");
 
 	Giraf::Trigger::register('public_function','core','bot_admin_main',\&bot_admin_main,'admin');
-	Giraf::Trigger::register('public_function','core','bot_register',\&bot_register,'register');
+	Giraf::Trigger::register('public_function','core','bot_admin_user',\&bot_admin_user,'user');
+	Giraf::Trigger::register('public_function','core','bot_admin_module',\&bot_admin_module,'module');
+	Giraf::Trigger::register('public_function','core','bot_register',\&bot_register_user,'register');
 
 	Giraf::Admin::module_authorized_update();
 }
@@ -64,7 +66,7 @@ sub init {
 sub set_param {
 	my ($param,$value)=@_;
 
-	Giraf::Core::debug("Giraf::Admin::set_param($param,$value)");
+	Giraf::Core::_debug("Giraf::Admin::set_param($param,$value)",5);
 
 	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_config(name,value) VALUES(?,?)");
 	$sth->execute($param,$value);
@@ -74,7 +76,7 @@ sub set_param {
 sub get_param {
 	my ($name) = @_;
 	
-	Giraf::Core::debug("Giraf::Admin::get_param($name)");
+	Giraf::Core::_debug("Giraf::Admin::get_param($name)",5);
 	
 	my $value;
 	my $sth=$_dbh->prepare("SELECT value FROM $_tbl_config WHERE name LIKE ?");
@@ -86,7 +88,7 @@ sub get_param {
 
 sub get_dbh {
 
-	Giraf::Core::debug("Giraf::Admin::get_dbh()");
+	Giraf::Core::_debug("Giraf::Admin::get_dbh()",5);
 
 	if( !$_dbh )
 	{
@@ -107,7 +109,7 @@ sub bot_admin_main {
 	$sub_func=shift(@tmp);
 	$args="@tmp";
 
-	Giraf::Core::debug("admin main : sub_func=$sub_func");
+	Giraf::Core::debug("admin main : sub_func=$sub_func, args=$args");
 
 	switch ($sub_func)
 	{
@@ -131,7 +133,7 @@ sub bot_admin_module {
 	$sub_func=shift(@tmp);
 	$args="@tmp";
 
-	Giraf::Core::debug("admin module : sub_func=$sub_func");
+	Giraf::Core::debug("admin module : sub_func=$sub_func, args=$args");
 
 	switch ($sub_func)
 	{
@@ -162,6 +164,7 @@ sub bot_admin_user {
 		case 'unignore'	{       push(@return,bot_unignore_user($nick,$dest,$args)); 	}
 		case 'promote'	{	push(@return,bot_promote_user($nick,$dest,$args));	}
 		case 'demote'	{	push(@return,bot_demote_user($nick,$dest,$args));	}
+		case 'status'	{	push(@return,bot_status_user($nick,$dest,$args));	}
 	}
 
 	return @return;
@@ -264,13 +267,20 @@ sub bot_register_user {
 
 	my @return;
 	my $ligne;
-	if(Giraf::User::user_register($nick))
+	if(!Giraf::Admin::is_user_registered($nick))
 	{
-		$ligne={ action =>"MSG",dest=>$dest,msg=>'Utilisateur [c=red]'.Giraf::User::getUUID($nick).'[/c] enregistré !'};
+		if(Giraf::User::user_register($nick))
+		{
+			$ligne={ action =>"MSG",dest=>$dest,msg=>'Utilisateur [c=red]'.Giraf::User::getUUID($nick).'[/c] enregistré !'};
+		}
+		else
+		{
+			$ligne={ action =>"MSG",dest=>$dest,msg=>'Impossible d\'enregistrer [c=red]'.Giraf::User::getUUID($nick).'[/c] !'};
+		}
 	}
 	else
 	{
-		$ligne={ action =>"MSG",dest=>$dest,msg=>'Impossible d\'enregistrer [c=red]'.Giraf::User::getUUID($nick).'[/c] !'};
+			$ligne={ action =>"MSG",dest=>$dest,msg=>'Impossible de se ré-enregistrer [c=red]'.$nick.'[/c] !'};
 	}
 	push(@return,$ligne);	
 	return @return;
@@ -283,11 +293,11 @@ sub bot_ignore_user {
 
 	my (@return, $ligne, @tmp, $who, $permanent);
 	@tmp=split(/\s+/,$args);
-	
+
 	$who=shift(@tmp);
 	$permanent=shift(@tmp);
-	
-	if($permanent eq "1")
+
+	if(defined($permanent) && $permanent eq "1")
 	{
 		$permanent=1;
 	}
@@ -297,7 +307,7 @@ sub bot_ignore_user {
 	}
 
 	Giraf::Core::debug("bot_ignore_user who=$who, perma=$permanent");
-	
+
 	if(Giraf::Admin::is_user_admin($nick) )
 	{
 		if(Giraf::User::user_ignore($who,$permanent))
@@ -342,7 +352,9 @@ sub bot_demote_user {
 	@tmp=split(/\s+/,$args);
 	$who=shift(@tmp);
 	Giraf::Core::debug("bot_demote_user who=$who");
-	if( Giraf::Admin::is_user_admin($nick) && !Giraf::Admin::is_user_botadmin($who) )
+	if( 	(Giraf::Admin::is_user_admin($nick) && !Giraf::Admin::is_user_botadmin($who)) || 
+		(Giraf::Admin::is_user_botadmin($nick) && $nick eq Giraf::Config::get('botadmin') && $who ne Giraf::Config::get('botadmin')) 
+	)
 	{
 		if(Giraf::User::user_update_privileges($who,0))
 		{
@@ -352,12 +364,20 @@ sub bot_demote_user {
 				my $sth=$_dbh->prepare("DELETE FROM $_tbl_chan_admin WHERE user_UUID LIKE ?");
 				$sth->execute($uuid);
 			}
-			$ligne={action => "MSG", dest=>$dest,msg=>"Utilisateur [c=red]".$who."[/c] rétrogradé !"};
+			else
+			{
+
+				$ligne={action => "MSG", dest=>$dest,msg=>"Utilisateur [c=red]".$who."[/c] rétrogradé !"};
+			}
 		}
 		else
 		{
-			$ligne={action => "MSG", dest=>$dest,msg=>"Impossible de retrograder [c=red]".$who."[/c]"};
+			$ligne={action => "MSG", dest=>$dest,msg=>"Impossible de retrograder [c=red]".$who."[/c] (bug?)"};
 		}
+	}
+	else
+	{
+		$ligne={action => "MSG", dest=>$dest,msg=>"Impossible de retrograder [c=red]".$who."[/c]"};
 	}
 	push(@return,$ligne);
 	return @return;
@@ -378,38 +398,44 @@ sub bot_promote_user {
 		case 'botadmin' 	{ 
 			if( Giraf::Admin::is_user_botadmin($nick) && !Giraf::Admin::is_user_botadmin($who) ) 
 			{
-				Giraf::User::user_register($who);
-				if(Giraf::User::user_update_privileges($who,'botadmin'))
+				if(Giraf::Admin::is_user_registered($who))
 				{
-					$ok=1;
+					if(Giraf::User::user_update_privileges($who,'botadmin'))
+					{
+						$ok=1;
+					}
 				}
 			}
 		}
 		case 'admin'		{ 	
 			if( Giraf::Admin::is_user_botadmin($nick) && !Giraf::Admin::is_user_admin($who) )
 			{
-				Giraf::User::user_register($who);
-				if(Giraf::User::user_update_privileges($who,'admin'))
+				if(Giraf::Admin::is_user_registered($who))
 				{
-					$ok=1;
+					if(Giraf::User::user_update_privileges($who,'admin'))
+					{
+						$ok=1;
+					}
 				}
 			}
 		}
 		case 'chan_admin'	{ 
-						my $chan=shift(@tmp);
-						if( Giraf::Admin::is_user_admin($nick) && !Giraf::Admin::is_user_chan_admin($who,$chan) && Giraf::Chan::is_chan_known($chan) )
-						{
-							Giraf::User::user_register($who);
-							my $uuid=Giraf::User::getUUID($who);
-							my $sth=$_dbh->prepare("INSERT INTO $_tbl_chan_admin (chan_name,user_UUID) VALUES (?,?)");
-							if( Giraf::User::user_update_privileges($who,'chan_admin') && $sth->execute($chan,$uuid) )
-							{
-								$ok=1;
-							}
-
-						}
-						$level="$level de $chan";
+			my $chan=shift(@tmp);
+			if( Giraf::Admin::is_user_admin($nick) && !Giraf::Admin::is_user_chan_admin($who,$chan) && Giraf::Chan::is_chan_known($chan) )
+			{
+				if(Giraf::Admin::is_user_registered($who))
+				{
+					my $uuid=Giraf::User::getUUID($who);
+					my $sth=$_dbh->prepare("INSERT INTO $_tbl_chan_admin (chan_name,user_UUID) VALUES (?,?)");
+					if( Giraf::User::user_update_privileges($who,'chan_admin') && $sth->execute($chan,$uuid) )
+					{
+						$ok=1;
 					}
+				}
+
+			}
+			$level="$level de $chan";
+		}
 		else			{ return @return }
 	}
 
@@ -425,28 +451,77 @@ sub bot_promote_user {
 	return @return;
 }
 
+sub bot_status_user {
+	my ($nick,$dest,$args) = @_;
+	my (@return,$ligne);
+
+	if( $args)
+	{
+		$nick=$args;
+	}
+
+	Giraf::Core::debug("Giraf::Admin::bot_status_user($nick)");
+
+	my $uuid=Giraf::User::getUUID($nick);
+	if(is_user_registered($nick))
+	{
+		if(is_user_botadmin($nick))
+		{
+			$ligne={action=>'MSG',dest=>$dest,msg=>'[c=red]'.$nick.'[/c] est botadmin (uuid = [c=green]'.$uuid.'[/c])'};
+
+		}
+		elsif(is_user_admin($nick))
+		{
+			$ligne={action=>'MSG',dest=>$dest,msg=>'[c=red]'.$nick.'[/c] est admin (uuid = [c=green]'.$uuid.'[/c])'};
+		}
+		elsif(Giraf::User::is_user_chan_admin($nick))
+		{
+			my ($sth,$chan,@chans);
+			$sth=$_dbh->prepare("SELECT chan_name FROM $_tbl_chan_admin WHERE user_UUID LIKE ?");
+			$sth->bind_columns(\$chan);
+			$sth->execute($uuid);
+			while($sth->fetch())
+			{
+				push(@chans,$chan);
+			}
+			$ligne={action=>'MSG',dest=>$dest,msg=>'[c=red]'.$nick.'[/c] est chan_admin pour le(s) chan(s) [c=blue]'.join('[/c] ; [c=blue]',@chans).'[/c] (uuid = [c=green]'.$uuid.'[/c])'};
+		}
+		else
+		{
+			$ligne={action=>'MSG',dest=>$dest,msg=>'[c=red]'.$nick.'[/c] est enregistré (uuid = [c=green]'.$uuid.'[/c])'};
+		}
+	}
+	else
+	{
+			$ligne={action=>'MSG',dest=>$dest,msg=>'[c=red]'.$nick.'[/c] n\'est pas enregistré (uuid = [c=green]'.$uuid.'[/c])'};
+	}
+
+	push(@return,$ligne);
+	return @return;
+}
+
 #Admin user management subs
 sub is_user_botadmin {
 	my ($user) = @_;
-	Giraf::Core::debug("Giraf::Admin::is_user_botadmin($user)");
+	Giraf::Core::_debug("Giraf::Admin::is_user_botadmin($user)",5);
 	return Giraf::User::is_user_botadmin($user);
 }
 
 sub is_user_admin {
 	my ($user) = @_;
-	Giraf::Core::debug("Giraf::Admin::is_user_admin($user)");
+	Giraf::Core::_debug("Giraf::Admin::is_user_admin($user)",5);
 	return Giraf::User::is_user_admin($user);
 }
 
 sub is_user_chan_admin {
 	my ($user,$chan) = @_;
-	Giraf::Core::debug("Giraf::Admin::is_user_chan_admin($user,$chan)");
+	Giraf::Core::_debug("Giraf::Admin::is_user_chan_admin($user,$chan)",5);
 	my ($uuid,$sth,$count);
 	if(is_user_admin($user))
 	{
 		return 1;
 	}
-	else
+	elsif(Giraf::User::is_user_chan_admin($user))
 	{
 		$uuid=Giraf::User::getUUID($user);
 		$sth=$_dbh->prepare("SELECT COUNT(*) FROM $_tbl_chan_admin WHERE chan_name LIKE ? AND user_UUID LIKE ?"); 
@@ -455,24 +530,28 @@ sub is_user_chan_admin {
 		$sth->fetch();
 		return (0+$count);
 	}
+	else
+	{
+		return 0;
+	}
 }
 
 sub is_user_registered {
 	my ($user) = @_;
-	Giraf::Core::debug("Giraf::Admin::is_user_registered");
+	Giraf::Core::_debug("Giraf::Admin::is_user_registered",5);
 	return Giraf::User::is_user_registered($user);
 }
 
 #Admin utility subs
 sub module_authorized {
 	my ($module_name,$chan) = @_;
-	Giraf::Core::debug("Giraf::Admin::module_authorized($module_name @ $chan)");
+	Giraf::Core::_debug("Giraf::Admin::module_authorized($module_name @ $chan)",5);
 	return (!$_auth_modules->{$chan}->{$module_name}->{disabled});
 }
 
 sub module_authorized_update {
 
-	Giraf::Core::debug("module_authorized_update()");
+	Giraf::Core::_debug("module_authorized_update()",3);
 
 	undef $_auth_modules;
 
@@ -491,27 +570,28 @@ sub module_authorized_update {
 #Admin user tracking subs
 sub add_user_in_chan {
 	my ($uuid,$chan) = @_;
-	Giraf::Core::debug("Giraf::Admin::add_user_in_chan($uuid,$chan)");
+	Giraf::Core::_debug("Giraf::Admin::add_user_in_chan($uuid,$chan)",3);
 	my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_users_in_chan (user_UUID,chan_name) VALUES (?,?)");
 	return $sth->execute($uuid,$chan);
 }
 
 sub del_user_in_chan {
 	my ($uuid,$chan) = @_;
-	Giraf::Core::debug("Giraf::Admin::del_user_in_chan($uuid,$chan)");
+	Giraf::Core::_debug("Giraf::Admin::del_user_in_chan($uuid,$chan)",3);
 	my $sth=$_dbh->prepare("DELETE FROM $_tbl_users_in_chan WHERE user_UUID LIKE ? AND chan_name LIKE ?");
 	return $sth->execute($uuid,$chan);
 }
 
 sub del_user_in_all_chan {
 	my ($uuid) = @_;
-	Giraf::Core::debug("Giraf::Admin::del_user_in_all_chan($uuid)");
+	Giraf::Core::_debug("Giraf::Admin::del_user_in_all_chan($uuid)",3);
 	my $sth=$_dbh->prepare("DELETE FROM $_tbl_users_in_chan WHERE user_UUID LIKE ?");
 	return $sth->execute($uuid);
 }
 
 sub user_unregister {
 	my ($uuid) = @_;
+	Giraf::Core::_debug("Giraf::Admin::user_unregister($uuid)",3);
 	my $sth=$_dbh->prepare("DELETE FROM $_tbl_chan_admin WHERE user_UUID LIKE ?");
 	return $sth->execute($uuid);
 }
