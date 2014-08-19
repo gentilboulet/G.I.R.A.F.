@@ -1,0 +1,11 @@
+/DB/*
+giraf.conf
+giraf.log
+.*.swp
+*/*.swp
+*/*/*.swp
+/tags
+*/tags
+*/*/tags
+*/*/*/tags
+*.*~
