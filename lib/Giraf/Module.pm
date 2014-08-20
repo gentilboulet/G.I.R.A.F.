@@ -97,7 +97,7 @@ sub init {
 
 	if(!$_ua)
 	{
-		$_ua=LWP::UserAgent->new;
+		$_ua=LWP::UserAgent->new(ssl_opts => { verify_hostname => 0 });
 	}
 
 
@@ -517,14 +517,20 @@ sub bot_install_module {
 					Giraf::Core::debug($f);
 					$nb_files++;
 					my $request=$_ua->get($url.'/'.$f);
+					my $ligne={ action =>"MSG",dest=>$dest,msg=>'url [c=yellow]'.$url.'/'.$f.'[/c]'};
+					push(@return,$ligne);
 					if($request->is_success)
 					{
 						open(MODFILE, '>'.'./lib/Giraf/Modules/'.$f);
 						print MODFILE $request->content;
 						close(MODFILE);
+						my $ligne={ action =>"MSG",dest=>$dest,msg=>'New file [c=yellow]'.'>'.'./lib/Giraf/Modules/'.$f.'[/c]'};
+						push(@return,$ligne);
 					}
 					else
 					{
+						my $ligne={ action =>"MSG",dest=>$dest,msg=>'Errow [c=yellow]'.$request->status_line.'[/c]'};
+						push(@return,$ligne);
 						$success=$success*0;
 					}
 				}
@@ -536,8 +542,12 @@ sub bot_install_module {
 					Giraf::Core::debug($s);
 					$nb_files++;
 					my $request=$_ua->get($url.'/'.$s);
+					my $ligne={ action =>"MSG",dest=>$dest,msg=>'url [c=yellow]'.$url.'/'.$s.'[/c]'};
+					push(@return,$ligne);
 					if($request->is_success)
 					{
+						my $ligne={ action =>"MSG",dest=>$dest,msg=>'New file [c=yellow]'.'>'.'./sql/'.$s.'[/c]'};
+						push(@return,$ligne);
 						open(MODSQL, '>'.'./sql/'.$s);
 						print MODSQL $request->content;
 						close(MODSQL);

@@ -107,7 +107,7 @@ sub irc_001
 sub irc_433
 {
 	my ($kernel) = $_[KERNEL];
-	$botname = "Mr_Bobby";
+	$botname = $botname."_";
 	$kernel->post( $irc => nick => $botname );
 	debug("Bot name : $botname");
 	sleep 1;

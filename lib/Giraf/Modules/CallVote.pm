@@ -40,7 +40,7 @@ sub unload {
 	Giraf::Trigger::unregister('on_uuid_change_function','CallVote','callvote_uuid_change');
 
 
-	Giraf::Session::post_event("callvote_end");
+	Giraf::Session::post_event('callvote_core','callvote_end');
 	foreach my $dest (keys(%$_votes))
 	{
 		Giraf::Session::call_event('callvote_core','vote_end',$dest);
