@@ -98,16 +98,6 @@ sub bot_list_session
 	return @return;
 }
 
-sub tick 
-{
-	Giraf::Core::debug("Griaf::TICK!!");
-	my @return;
-	my $ligne={ action =>"MSG",dest=>"#giraf",msg=>"tick.... !"};
-	my $session_id = $_[SESSION]->ID;
-	push(@return,$ligne);
-	Giraf::Core::emit(@return);
-}
-
 sub bot_start_session
 {
 	my ($nick,$dest,$what)=@_;
@@ -134,8 +124,6 @@ sub bot_start_session
 			else
 			{
 				init_session("$session_alias");
-				my $coderef = \&tick;
-				add_event($session_alias, "next",  $coderef );
 				my $ligne={ action =>"MSG",dest=>$dest,msg=>"La session $session_alias est [c=green]lancee[/c] !"};
 				push(@return,$ligne);
 			}
