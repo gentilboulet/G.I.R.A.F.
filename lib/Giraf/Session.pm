@@ -214,8 +214,8 @@ sub shutdown_session
 sub post_event
 {
 	my ($session_alias, $event_name, @args) = @_;
-	$_kernel->post($session_alias => $event_name => @args);
 	Giraf::Core::debug("Giraf::Session::post_event($session_alias, $event_name, (@args) );");
+	$_kernel->post($session_alias => $event_name => @args);
 	return ;
 }
 
@@ -244,43 +244,45 @@ sub rm_event
 sub set_delay_event
 {
 	my ($session_alias, $event, $delay, @args) = @_;		
+	Giraf::Core::debug("Giraf::Session:set_delay_event($event,$delay,(@args))");
 	my $session = $_kernel->alias_resolve($session_alias);
 	my $delay_id = call_event($session_alias, "_delay_event", ($event, $delay, @args));
-	Giraf::Core::debug("Giraf::Session:set_delay_event($event,$delay,(@args)) = $delay_id");
+	Giraf::Core::debug("Giraf::Session:set_delay_even(id=$delay_id)");
 	return $delay_id;
 }
 
 sub set_alarm_event
 {
 	my ($session_alias, $event, $alarm, @args) = @_;		
+	Giraf::Core::debug("Giraf::Session:set_alarm_event($event,$alarm,(@args))");
 	my $session = $_kernel->alias_resolve($session_alias);
 	my $alarm_id = call_event($session_alias, "_alarm_event", ($event, $alarm, @args));
-	Giraf::Core::debug("Giraf::Session:set_alarm_event($event,$alarm,(@args)) = $alarm_id");
+	Giraf::Core::debug("Giraf::Session:set_alarm_even(id=$alarm_id)");
 	return $alarm_id;
 }
 
 sub adjust_delay_event
 {
 	my ($session_alias, $delay_id, $new_delay) = @_;		
+	Giraf::Core::debug("Giraf::Session:adjust_delay_event($delay_id,$new_delay)");
 	my $session = $_kernel->alias_resolve($session_alias);
 	call_event($session_alias, "_adjust_delay_event", ($delay_id, $new_delay));
-	Giraf::Core::debug("Giraf::Session:adjust_delay_event($delay_id,$new_delay)");
 }
 
 sub adjust_alarm_event
 {
 	my ($session_alias, $alarm_id, $new_alarm) = @_;		
+	Giraf::Core::debug("Giraf::Session:adjust_alarm_event($alarm_id,$new_alarm)");
 	my $session = $_kernel->alias_resolve($session_alias);
 	call_event($session_alias, "_adjust_alarm_event", ($alarm_id, $new_alarm));
-	Giraf::Core::debug("Giraf::Session:adjust_alarm_event($alarm_id,$new_alarm)");
 }
 
 sub remove_event_timer
 {
 	my ($session_alias, $timer_id) = @_;		
+	Giraf::Core::debug("Giraf::Session::remove_event_timer($timer_id)");
 	my $session = $_kernel->alias_resolve($session_alias);
 	call_event($session_alias, "_remove_timer_event", ($timer_id));
-	Giraf::Core::debug("Giraf::Session::remove_event_timer($timer_id)");
 }
 
 ###################################

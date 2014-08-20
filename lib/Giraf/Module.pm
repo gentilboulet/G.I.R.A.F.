@@ -18,8 +18,6 @@ use Data::Dumper;
 # Public vars
 
 # Private vars
-our $_kernel;
-our $_irc;
 our $_dbh;
 our $_tbl_modules = 'modules';
 our $_tbl_users = 'users';
@@ -53,10 +51,6 @@ sub mod_mark_loaded {
 }
 
 sub init {
-	my ( $ker, $irc_session ) = @_;
-	$_kernel  = $ker;
-	$_irc     = $irc_session;
-
 	my ($req);
 
 	Giraf::Core::debug("Giraf::Module::init()");
@@ -88,7 +82,7 @@ sub init {
 				mod_mark_loaded($module_name,0);
 			}
 			else {
-				mod_run($module_name, 'init', $ker, $irc_session);
+				mod_run($module_name, 'init');
 				# Mark module as loaded
 				mod_mark_loaded($module_name,1);
 			}
@@ -195,7 +189,7 @@ sub bot_reload_modules
 						$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] borken ! (non chargé)'};
 					}
 					else {
-						mod_run($module_name, 'init', $_kernel, $_irc); # TODO: check return
+						mod_run($module_name, 'init'); # TODO: check return
 						mod_mark_loaded($module_name, 1);
 						$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$module_name.'[/c] rechargé !'};
 					}
@@ -229,7 +223,7 @@ sub bot_load_module {
 					$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$mod_exact_name.'[/c] borken ! (non chargé)'};
 				}
 				else {
-					mod_run($mod_exact_name, 'init', $_kernel, $_irc); # TODO: check return
+					mod_run($mod_exact_name, 'init'); # TODO: check return
 					mod_mark_loaded($mod_exact_name,1);
 					$ligne={ action =>"MSG",dest=>$dest,msg=>'Module [c=red]'.$mod_exact_name.'[/c] chargé !'};
 				}
