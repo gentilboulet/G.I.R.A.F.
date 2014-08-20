@@ -2,7 +2,37 @@
 	<module>
 		<name>Weee</name>
 		<version>1</version>
-		<url_root>http://raw.githubusercontent.com/gentilboulet/G.I.R.A.F./master/lib/Giraf/Modules/Weee.pm</url_root>
+		<url_root>https://raw.githubusercontent.com/gentilboulet/G.I.R.A.F./master/lib/Giraf/Modules/</url_root>
 		<file>Weee.pm</file>
+	</module>
+	<module>
+		<name>CallVote</name>
+		<version>1</version>
+		<url_root>https://raw.githubusercontent.com/gentilboulet/G.I.R.A.F./master/lib/Giraf/Modules/</url_root>
+		<file>CallVote.pm</file>
+	</module>
+        <module>
+		<name>Dice</name>
+		<version>1</version>
+		<url_root>https://raw.githubusercontent.com/gentilboulet/G.I.R.A.F./master/lib/Giraf/Modules/</url_root>
+		<file>Dice.pm</file>
+	</module>
+	<module>
+		<name>Gygax</name>
+		<version>1</version>
+		<url_root>https://raw.githubusercontent.com/gentilboulet/G.I.R.A.F./master/lib/Giraf/Modules/</url_root>
+		<file>Gygax.pm</file>
+	</module>
+	<module>
+		<name>Search</name>
+		<version>1</version>
+		<url_root>https://raw.githubusercontent.com/gentilboulet/G.I.R.A.F./master/lib/Giraf/Modules/</url_root>
+		<file>Search.pm</file>
+	</module>
+	<module>
+		<name>String</name>
+		<version>1</version>
+		<url_root>https://raw.githubusercontent.com/gentilboulet/G.I.R.A.F./master/lib/Giraf/Modules/</url_root>
+		<file>String.pm</file>
 	</module>
 </module_list>
