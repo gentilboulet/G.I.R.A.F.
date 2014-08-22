@@ -4,6 +4,7 @@ $| = 1;
 package Giraf::Chan;
 
 use Giraf::Core;
+use Giraf::Session;
 
 use strict;
 use warnings;
@@ -15,7 +16,6 @@ use POE;
 our $_dbh;
 our $_kernel;
 our $_irc;
-our $_session_launched=0;
 
 our $_tbl_chans='chans';
 
@@ -43,7 +43,8 @@ sub init {
 	}
 
 	Giraf::Trigger::register('on_kick_function','core','bot_on_kick',\&bot_on_kick);
-	launch_session();
+	Giraf::Session::init_session('chan_core');
+	start_session();
 }
 
 sub join {
@@ -55,8 +56,10 @@ sub join {
 	{
 		my $sth=$_dbh->prepare("INSERT OR REPLACE INTO $_tbl_chans (name,joined) VALUES (?,1)");	
 		$sth->execute($chan);
-		$_kernel->post( $_irc => join => $chan );
-		$_kernel->post( $_irc => who => $chan );
+		#Giraf::Session::post_event('irc_core','join',$chan);
+		#Giraf::Session::post_event('irc_core','who',$chan);
+		$_kernel->post( $_irc => join => $chan);
+		$_kernel->post( $_irc => who  => $chan);
 	}
 }
 
@@ -75,6 +78,7 @@ sub part {
 	$sth->execute($chan);
 	Giraf::Core::debug("Part _irc =$_irc ; _kernel =$_kernel");
 	$_kernel->post( $_irc => part => $chan => $reason );
+	#Giraf::Session::post_event('irc_core','part',($chan,$reason));
 }
 
 sub is_chan_known {
@@ -119,7 +123,7 @@ sub bot_on_kick {
 
 		if($autorejoin) 
 		{
-			$_kernel->post(chan_core=> launch_delayed_join => $chan);
+			Giraf::Session::post_event('chan_core','launch_delayed_join',$chan);
 		}
 	}
 	return @return;
@@ -128,44 +132,25 @@ sub bot_on_kick {
 #################################
 # Session management subs !	#
 #################################
-sub chan_session_init {
-	my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
-	Giraf::Core::debug("chan_core::_start()");
-	$_[KERNEL]->alias_set('chan_core');
-}
-
-sub chan_session_stop {
-	Giraf::Core::debug("chan_core::_stop()");
-}
-
 sub launch_delayed_join {
-	my ($kernel, $heap, $chan) = @_[ KERNEL, HEAP, ARG0 ];
+	my ($chan) = @_[ KERNEL, HEAP, ARG0 ];
 	Giraf::Core::debug("chan_core::launch_delayed_join($chan)");
-	$kernel->delay_set( 'delayed_join' , 61, $chan);
+	Giraf::Session::set_delay_event('chan_core','delayed_join',61, $chan);
 }
 
 sub delayed_join {
-	my ($kernel, $heap, $chan) = @_[ KERNEL, HEAP, ARG0 ];
+	my ($chan) = @_[ KERNEL, HEAP, ARG0 ];
 	Giraf::Core::debug("chan_core::delayed_join($chan)");
 	Giraf::Chan::join($chan);
 	if(!is_chan_joined($chan))
 	{
-		$kernel->delay_set( 'delayed_join' , 61, $chan);
+		Giraf::Session::set_delay_event('chan_core','delayed_join',61, $chan);
 	}
 }
 
-sub launch_session {
-	if(!$_session_launched)
-	{
-		$_session_launched=1;
-		POE::Session->create(
-			inline_states => {
-				_start => \&Giraf::Chan::chan_session_init,
-				_stop => \&Giraf::Chan::chan_session_stop,
-				launch_delayed_join => \&Giraf::Chan::launch_delayed_join,
-				delayed_join => \&Giraf::Chan::delayed_join,
-			},
-		);
-	}
+sub start_session {
+	Giraf::Core::debug("Giraf::Chan::start_session()");
+	Giraf::Session::add_event('chan_core','launch_delayed_join',\&Giraf::Chan::launch_delayed_join);
+	Giraf::Session::add_event('chan_core','delayed_join',\&Giraf::Chan::delayed_join);
 }
 1;

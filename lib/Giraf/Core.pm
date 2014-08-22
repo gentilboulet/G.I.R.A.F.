@@ -334,13 +334,14 @@ sub _start
 	my $irc_session = $heap->{irc}->session_id();
 	$kernel->post( $irc_session => register => 'all' );
 	$kernel->post( $irc_session => connect => {} );
+	$_[KERNEL]->alias_set('irc_core');
 	undef;
-	Giraf::Admin::init( $kernel, $irc);
-	Giraf::Chan::init( $kernel,  $irc ,$botname);
-	Giraf::User::init( $kernel,  $irc ,$botname);
-	Giraf::Trigger::init( $kernel, $irc ,$triggers);
-	Giraf::Module::init( $kernel,  $irc);
 	Giraf::Session::init( $kernel, $irc);
+	Giraf::Admin::init( );
+	Giraf::Chan::init( $kernel,  $irc );
+	Giraf::User::init( );
+	Giraf::Trigger::init( $kernel, $irc ,$triggers);
+	Giraf::Module::init( );
 	$kernel->post ($irc_session =>  'privmsg' => nickserv => "IDENTIFY ".Giraf::Config::get('botpass'));
 	$kernel->sig( INT => "sigint" );
 }

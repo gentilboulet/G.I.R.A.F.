@@ -15,8 +15,6 @@ use DBI;
 # Private vars
 our $_dbh;
 our $_mem_dbh;
-our $_kernel;
-our $_irc;
 our $_botadmin_registered=0;
 
 our $_tbl_users='users';
@@ -24,12 +22,7 @@ our $_tbl_nick_history='nick_history';
 our $_tbl_ignores='ignores';
 
 sub init {
-	my ( $ker, $irc_session) = @_;
-	
 	my ($sth,$uuid);
-
-	$_kernel  = $ker;
-	$_irc     = $irc_session;
 
 	$_dbh = Giraf::Admin::get_dbh();
 	$_dbh->do("BEGIN TRANSACTION;");

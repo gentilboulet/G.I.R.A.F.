@@ -18,10 +18,7 @@ use Switch;
 # Public vars
 
 # Private vars
-our $_kernel;
-our $_irc;
 our $_dbh;
-our $_botname;
 
 our $_tbl_config='config';
 our $_tbl_modules_access='modules_access';
@@ -34,10 +31,6 @@ our $_tbl_modules;
 our $_auth_modules;
 
 sub init {
-	my ( $ker, $irc_session, $botname) = @_;
-	$_kernel  = $ker;
-	$_irc     = $irc_session;
-	$_botname = $botname;
 
 	Giraf::Core::_debug("Giraf::Admin::init()",1);
 
@@ -58,6 +51,11 @@ sub init {
 	Giraf::Trigger::register('public_function','core','bot_admin_user',\&bot_admin_user,'user');
 	Giraf::Trigger::register('public_function','core','bot_admin_module',\&bot_admin_module,'module');
 	Giraf::Trigger::register('public_function','core','bot_register',\&bot_register_user,'register');
+	
+	Giraf::Trigger::register('private_function','core','bot_admin_main',\&bot_admin_main,'admin');
+	Giraf::Trigger::register('private_function','core','bot_admin_user',\&bot_admin_user,'user');
+	Giraf::Trigger::register('private_function','core','bot_admin_module',\&bot_admin_module,'module');
+	Giraf::Trigger::register('private_function','core','bot_register',\&bot_register_user,'register');
 
 	Giraf::Admin::module_authorized_update();
 }
