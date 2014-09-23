@@ -32,7 +32,7 @@ sub init {
 	Giraf::Core::debug("Giraf::Modules::GPS::init()");
 
 	Giraf::Trigger::register('public_function','GPS','bot_gps',\&bot_gps,'gps\s+');
-	Giraf::Trigger::register('public_function','GPS','bot_middle',\&bot_middle,'middle');
+	Giraf::Trigger::register('public_function','GPS','bot_gps_middle',\&bot_gps_middle,'gps_middle');
 	if(!$_ua)
 	{
 		$_ua=LWP::UserAgent->new;
@@ -46,7 +46,7 @@ sub unload {
 	Giraf::Core::debug("Giraf::Modules::GPS::unload()");
 
 	Giraf::Trigger::unregister('public_function','GPS','bot_gps');
-	Giraf::Trigger::unregister('public_function','GPS','bot_middle');
+	Giraf::Trigger::unregister('public_function','GPS','bot_gps_middle');
 }
 
 sub bot_gps {
@@ -115,10 +115,10 @@ sub bot_gps {
 	return @return;
 }
 
-sub bot_middle {
+sub bot_gps_middle {
 	my($nick, $dest, $what)=@_;
 
-	Giraf::Core::debug("Giraf::Modules::GPS::bot_middle()");
+	Giraf::Core::debug("Giraf::Modules::GPS::bot_gps_middle()");
 
 	my $message = '';
 	my @return;
