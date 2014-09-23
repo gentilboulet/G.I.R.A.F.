@@ -24,6 +24,12 @@
 		<file>Gygax.pm</file>
 	</module>
 	<module>
+		<name>GPS</name>
+		<version>1</version>
+		<url_root>https://raw.githubusercontent.com/gentilboulet/G.I.R.A.F./master/lib/Giraf/Modules/</url_root>
+		<file>GPS.pm</file>
+	</module>
+	<module>
 		<name>Search</name>
 		<version>1</version>
 		<url_root>https://raw.githubusercontent.com/gentilboulet/G.I.R.A.F./master/lib/Giraf/Modules/</url_root>
