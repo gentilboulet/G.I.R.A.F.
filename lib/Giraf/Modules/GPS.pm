@@ -14,6 +14,7 @@ use Data::Dumper;
 use List::Util qw(sum);
 use Math::Trig;
 use Math::Trig ':radial';
+use Geo::Coordinates::DecimalDegrees;
 use utf8;
 
 our $version=1;
@@ -31,7 +32,7 @@ sub init {
 	Giraf::Core::debug("Giraf::Modules::GPS::init()");
 
 	Giraf::Trigger::register('public_function','GPS','bot_gps',\&bot_gps,'gps\s+');
-	Giraf::Trigger::register('public_function','GPS','bot_middle',\&bot_middle,'middle');
+	Giraf::Trigger::register('public_function','GPS','bot_gps_middle',\&bot_gps_middle,'gps_middle');
 	if(!$_ua)
 	{
 		$_ua=LWP::UserAgent->new;
@@ -45,7 +46,7 @@ sub unload {
 	Giraf::Core::debug("Giraf::Modules::GPS::unload()");
 
 	Giraf::Trigger::unregister('public_function','GPS','bot_gps');
-	Giraf::Trigger::unregister('public_function','GPS','bot_middle');
+	Giraf::Trigger::unregister('public_function','GPS','bot_gps_middle');
 }
 
 sub bot_gps {
@@ -60,14 +61,16 @@ sub bot_gps {
 	my $search_str=$what;
 	utf8::decode($search_str);
 	$GoogleAPIUrl =$GoogleAPIUrl.$search_str;
+	Giraf::Core::debug($GoogleAPIUrl);
 	my $request=$_ua->get($GoogleAPIUrl,referer=>$referer);
+	Giraf::Core::debug(Dumper($request));
 	if($request->is_success)
 	{
 		my $data=$request->content;
 		my $data_decode = decode_json($data);
 		my $message = '';
 
-		# Giraf::Core::debug(Dumper($data_decode));
+		Giraf::Core::debug(Dumper($data_decode));
 		# Parsing JSON
 
 		
@@ -75,10 +78,11 @@ sub bot_gps {
 			$message .= 'Pas de résultat trouvé pour [c=red]'.$search_str.'[/c].' if $middle == undef;
 			$message .= "[c=orange]Un seul[/c] point a \x{e9}t\x{e9} entr\x{e9} : " if $middle == 1;
 			$message .= "Le [c=teal]centre[/c] de ces [c=orange]".$middle."[/c] points se situe \x{e0} ces coordonn\x{e9}es : " if $middle > 1;
-			$message .= "[c=yellow]".$what.'[/c]. https://www.google.com/maps/?q='.$what if $middle > 0;
+			$message .= "[c=yellow]".$search_str.'[/c]. https://www.google.com/maps/?q='.$search_str if $middle > 0;
 		} else {
 			my $lat = $data_decode->{'results'}[0]->{'geometry'}->{'location'}->{'lat'};
 			my $lng = $data_decode->{'results'}[0]->{'geometry'}->{'location'}->{'lng'};
+
 			my $txt_address = $data_decode->{'results'}[0]->{'formatted_address'};
 
 			$message .= "Coordonn\x{e9}es GPS pour " if $middle == undef;
@@ -87,8 +91,8 @@ sub bot_gps {
 
 			$message .= "[c=green]".$txt_address.'[/c] : ';
 
-			$message .= '[c=yellow]'.sprintf("%.7f,%.7f", $lat, $lng).'[/c]' if $middle == undef;
-			$message .= "[c=yellow]".$what.'[/c]. https://www.google.com/maps/?q='.$what if $middle > 0;
+			$message .= '[c=yellow]'.to_DMS($lat, $lng).'[/c]' if $middle == undef;
+			$message .= "[c=yellow]".$search_str.'[/c]. https://www.google.com/maps/?q='.$search_str if $middle > 0;
 
 			if ($middle == undef) {
 				my $theta = deg2rad($lng);
@@ -111,10 +115,10 @@ sub bot_gps {
 	return @return;
 }
 
-sub bot_middle {
+sub bot_gps_middle {
 	my($nick, $dest, $what)=@_;
 
-	Giraf::Core::debug("Giraf::Modules::GPS::bot_middle()");
+	Giraf::Core::debug("Giraf::Modules::GPS::bot_gps_middle()");
 
 	my $message = '';
 	my @return;
@@ -129,8 +133,11 @@ sub bot_middle {
 		if ($rho > 1e-7) {
 			my $lat = 90 - rad2deg($phi);
 			my $lng = rad2deg($theta);
+
+			my $txt_coord = to_DMS($lat, $lng);
+			utf8::encode($txt_coord);
 			
-			@return = bot_gps ($nick, $dest, sprintf("%.7f,%.7f", $lat, $lng), scalar(@{$_x->{$dest}}));
+			@return = bot_gps ($nick, $dest, $txt_coord, scalar(@{$_x->{$dest}}));
 		} else {
 			$message .= "Il n'est pas possible de trouver un [c=teal]point central[/c]. Suppression des [c=purple]points enregistr\x{e9}s[/c].";
 			utf8::encode($message);
@@ -151,5 +158,15 @@ sub bot_middle {
 	return @return;
 }
 
+sub to_DMS {
+	my ($lat, $lng) = @_;
+
+	my ($dlat, $mlat, $slat, $snlat) = decimal2dms($lat);
+	my ($dlng, $mlng, $slng, $snlng) = decimal2dms($lng);
+	my $strcoords = abs($dlat).'°'.$mlat."'".int($slat).'"'.($snlat < 0 ? 'S' : 'N').',';
+	$strcoords .= abs($dlng).'°'.$mlng."'".int($slng).'"'.($snlng < 0 ? 'W' : 'E');
+
+	return ($strcoords);
+}
 
 1;
