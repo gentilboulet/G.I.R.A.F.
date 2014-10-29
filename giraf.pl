@@ -8,7 +8,11 @@ use warnings;
 
 use Giraf::Core;
 
-my $cfg_file = "giraf.conf";	# TODO: parameter line
+my $cfg_file = "giraf.conf";
+if ($#ARGV == 0) {
+    $cfg_file = $ARGV[0];
+}
+Giraf::Core::debug("Giraf will use $cfg_file as config file.");
 
 Giraf::Core::init($cfg_file) or die "Cannot load config from $cfg_file !";
 Giraf::Core::run();
